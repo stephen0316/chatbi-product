@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>产品退市筛选</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <aside class="sidebar" aria-label="上传与操作">
+          <div class="brand-block">
+            <h1>产品退市筛选</h1>
+            <p>上传全量产品清单与收入明细，自动生成退市建议表。</p>
+          </div>
+
+          <form id="uploadForm" class="upload-panel">
+            <label class="file-field">
+              <span class="file-label">产品全量列表</span>
+              <input id="productList" name="productList" type="file" accept=".xlsx,.xls,.xlsm" required />
+              <span class="upload-card" aria-hidden="true">
+                <span class="excel-icon">X</span>
+                <span class="upload-copy">
+                  <strong>选择 Excel 文件</strong>
+                  <small id="productListFiles">未选择文件</small>
+                </span>
+              </span>
+            </label>
+            <label class="file-field">
+              <span class="file-label">收入及直接成本明细表</span>
+              <input id="revenueFiles" name="revenueFiles" type="file" accept=".xlsx,.xls,.xlsm" multiple required />
+              <span class="upload-card" aria-hidden="true">
+                <span class="excel-icon">X</span>
+                <span class="upload-copy">
+                  <strong>选择一个或多个 Excel 文件</strong>
+                  <small id="revenueFileList">未选择文件</small>
+                </span>
+              </span>
+            </label>
+            <button class="primary" type="submit">上传并分析</button>
+          </form>
+
+          <div class="action-row">
+            <a class="secondary disabled" id="downloadLink" href="/api/download">下载结果</a>
+            <button class="danger" id="clearCache" type="button">删除缓存</button>
+          </div>
+
+          <div class="status-panel" id="statusPanel">
+            <div class="status-title">当前状态</div>
+            <div id="statusText">等待上传</div>
+          </div>
+        </aside>
+
+        <section class="main-panel">
+          <div class="summary-grid" id="summaryGrid">
+            <div class="metric"><span class="metric-title">符合退市条件的产品</span><strong>-</strong></div>
+            <div class="metric">
+              <span class="metric-title">
+                强制退市
+                <span class="metric-help">
+                  <span class="help-icon" aria-label="强制退市规则">?</span>
+                  <span class="tooltip">规则 1：已上市/已入库但未出现在收入及直接成本明细表<br />规则 2：创建时间超过2年或为空，且2年内产品收入为0</span>
+                </span>
+              </span>
+              <strong>-</strong>
+            </div>
+            <div class="metric">
+              <span class="metric-title">
+                建议退市
+                <span class="metric-help">
+                  <span class="help-icon" aria-label="建议退市规则">?</span>
+                  <span class="tooltip">规则 3：创建时间超过2年或为空，且2年内产品毛利≤0<br />规则 4：产品状态为退市中（暂不判断超过1年）</span>
+                </span>
+              </span>
+              <strong>-</strong>
+            </div>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="结果视图">
+            <button class="tab active" data-view="table" type="button">结果表</button>
+            <button class="tab" data-view="chat" type="button">智能问答</button>
+          </div>
+
+          <section class="view active" id="tableView">
+            <div class="table-toolbar">
+              <input id="searchInput" type="search" placeholder="搜索产品编码、名称、部门、理由" />
+              <select id="typeFilter">
+                <option value="">全部退市类型</option>
+                <option value="强制退市">强制退市</option>
+                <option value="建议退市">建议退市</option>
+              </select>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>产品编码</th>
+                    <th>产品名称</th>
+                    <th>产品状态</th>
+                    <th>创建时间</th>
+                    <th>部门</th>
+                    <th>产品收入</th>
+                    <th>产品毛利</th>
+                    <th>退市类型</th>
+                    <th>理由</th>
+                  </tr>
+                </thead>
+                <tbody id="resultBody">
+                  <tr><td colspan="9" class="empty">暂无分析结果</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view" id="chatView">
+            <div class="chat-log" id="chatLog">
+              <div class="assistant-msg">上传并分析后，可以询问“强制退市有多少条”“规则2命中了哪些口径”等问题。</div>
+            </div>
+            <form class="chat-box" id="chatForm">
+              <input id="questionInput" type="text" placeholder="输入关于本次上传表格的问题" />
+              <button class="primary" type="submit">提问</button>
+            </form>
+          </section>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
