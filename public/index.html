@@ -3,93 +3,71 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>产品退市筛选</title>
+    <title>产品退市分析</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <main class="app-shell">
       <section class="workspace">
-        <aside class="sidebar" aria-label="上传与操作">
-          <div class="brand-block">
-            <h1>产品退市筛选</h1>
-            <p>上传全量产品清单与收入明细，自动生成退市建议表。</p>
-          </div>
-
-          <form id="uploadForm" class="upload-panel">
-            <label class="file-field">
-              <span class="file-label">产品全量列表</span>
-              <input id="productList" name="productList" type="file" accept=".xlsx,.xls,.xlsm" required />
-              <span class="upload-card" aria-hidden="true">
-                <span class="excel-icon">X</span>
-                <span class="upload-copy">
-                  <strong>选择 Excel 文件</strong>
-                  <small id="productListFiles">未选择文件</small>
-                </span>
-              </span>
-            </label>
-            <label class="file-field">
-              <span class="file-label">收入及直接成本明细表</span>
-              <input id="revenueFiles" name="revenueFiles" type="file" accept=".xlsx,.xls,.xlsm" multiple required />
-              <span class="upload-card" aria-hidden="true">
-                <span class="excel-icon">X</span>
-                <span class="upload-copy">
-                  <strong>选择一个或多个 Excel 文件</strong>
-                  <small id="revenueFileList">未选择文件</small>
-                </span>
-              </span>
-            </label>
-            <button class="primary" type="submit">上传并分析</button>
-          </form>
-
-          <div class="action-row">
-            <a class="secondary disabled" id="downloadLink" href="/api/download">下载结果</a>
-            <button class="danger" id="clearCache" type="button">删除缓存</button>
-          </div>
-
-          <div class="status-panel" id="statusPanel">
-            <div class="status-title">当前状态</div>
-            <div id="statusText">等待上传</div>
-          </div>
-        </aside>
-
-        <section class="main-panel">
-          <div class="summary-grid" id="summaryGrid">
-            <div class="metric"><span class="metric-title">符合退市条件的产品</span><strong>-</strong></div>
-            <div class="metric">
-              <span class="metric-title">
-                强制退市
-                <span class="metric-help">
-                  <span class="help-icon" aria-label="强制退市规则">?</span>
-                  <span class="tooltip">规则 1：已上市/已入库但未出现在收入及直接成本明细表<br />规则 2：创建时间超过2年或为空，且2年内产品收入为0</span>
-                </span>
-              </span>
-              <strong>-</strong>
-            </div>
-            <div class="metric">
-              <span class="metric-title">
-                建议退市
-                <span class="metric-help">
-                  <span class="help-icon" aria-label="建议退市规则">?</span>
-                  <span class="tooltip">规则 3：创建时间超过2年或为空，且2年内产品毛利≤0<br />规则 4：产品状态为退市中（暂不判断超过1年）</span>
-                </span>
-              </span>
-              <strong>-</strong>
+        <section class="upload-section" aria-label="上传与操作">
+          <div class="upload-header">
+            <div class="brand-block">
+              <h1>产品退市分析</h1>
+              <p>上传全量产品清单与收入明细，自动生成退市建议表。</p>
             </div>
           </div>
-
-          <div class="tabs" role="tablist" aria-label="结果视图">
-            <button class="tab active" data-view="table" type="button">结果表</button>
-            <button class="tab" data-view="chat" type="button">智能问答</button>
+          <div class="upload-entry">
+            <button class="primary upload-open" id="openUpload" type="button">上传文件</button>
           </div>
+        </section>
 
-          <section class="view active" id="tableView">
-            <div class="table-toolbar">
-              <input id="searchInput" type="search" placeholder="搜索产品编码、名称、部门、理由" />
-              <select id="typeFilter">
-                <option value="">全部退市类型</option>
-                <option value="强制退市">强制退市</option>
-                <option value="建议退市">建议退市</option>
-              </select>
+        <section class="analysis-area" id="analysisArea">
+          <section class="main-panel">
+            <div class="summary-grid" id="summaryGrid">
+              <div class="metric"><span class="metric-title">符合退市条件的产品</span><strong>-</strong></div>
+              <div class="metric">
+                <span class="metric-title">
+                  强制退市
+                  <span class="metric-help">
+                    <span class="help-icon" aria-label="强制退市规则">
+                      <svg class="icon" viewBox="0 0 1024 1024" aria-hidden="true">
+                        <path d="M512 64C264.58 64 64 264.58 64 512s200.58 448 448 448c247.31-0.28 447.72-200.69 448-448 0-247.42-200.58-448-448-448z m0 832c-212.08 0-384-171.92-384-384s171.92-384 384-384c211.97 0.25 383.75 172.02 384 384 0 212.08-171.92 384-384 384z" fill="#a1a3a5"></path>
+                        <path d="M512.38 768c-17.67 0-32-14.33-32-32V448c0-17.67 14.33-32 32-32s32 14.33 32 32v288c0 17.67-14.32 32-32 32zM512 332.8c-21.21 0-38.4-17.19-38.4-38.4 0-21.21 17.19-38.4 38.4-38.4 21.21 0 38.4 17.19 38.4 38.4 0 21.21-17.19 38.4-38.4 38.4z" fill="#a1a3a5"></path>
+                      </svg>
+                    </span>
+                    <span class="tooltip">规则 1：已上市/已入库但未出现在收入及直接成本明细表<br />规则 2：创建时间超过2年，且2年内产品收入为0</span>
+                  </span>
+                </span>
+                <strong>-</strong>
+              </div>
+              <div class="metric">
+                <span class="metric-title">
+                  建议退市
+                  <span class="metric-help">
+                    <span class="help-icon" aria-label="建议退市规则">
+                      <svg class="icon" viewBox="0 0 1024 1024" aria-hidden="true">
+                        <path d="M512 64C264.58 64 64 264.58 64 512s200.58 448 448 448c247.31-0.28 447.72-200.69 448-448 0-247.42-200.58-448-448-448z m0 832c-212.08 0-384-171.92-384-384s171.92-384 384-384c211.97 0.25 383.75 172.02 384 384 0 212.08-171.92 384-384 384z" fill="#a1a3a5"></path>
+                        <path d="M512.38 768c-17.67 0-32-14.33-32-32V448c0-17.67 14.33-32 32-32s32 14.33 32 32v288c0 17.67-14.32 32-32 32zM512 332.8c-21.21 0-38.4-17.19-38.4-38.4 0-21.21 17.19-38.4 38.4-38.4 21.21 0 38.4 17.19 38.4 38.4 0 21.21-17.19 38.4-38.4 38.4z" fill="#a1a3a5"></path>
+                      </svg>
+                    </span>
+                    <span class="tooltip">规则 3：创建时间超过2年，且2年内产品毛利≤0<br />规则 4：处于“退市中”状态超过 1 年</span>
+                  </span>
+                </span>
+                <strong>-</strong>
+              </div>
+            </div>
+
+            <div class="result-tools">
+              <input id="searchInput" type="search" placeholder="搜索产品编码、名称、部门" />
+              <div class="result-actions">
+                <button class="secondary missing-approval-button disabled" id="missingApprovalToggle" type="button">缺审批时间</button>
+                <a class="secondary export-button disabled" id="downloadLink" href="/api/download">全部导出</a>
+                <button class="chat-toggle" id="openChat" type="button" aria-controls="chatDrawer" aria-expanded="false">
+                  <span class="chat-toggle-icon" aria-hidden="true">AI</span>
+                  <span>智能问答</span>
+                </button>
+              </div>
             </div>
             <div class="table-wrap">
               <table>
@@ -111,20 +89,89 @@
                 </tbody>
               </table>
             </div>
+            <div class="list-loading" id="listLoading" hidden>
+              <span class="spinner" aria-hidden="true"></span>
+              <span>正在分析...</span>
+            </div>
           </section>
 
-          <section class="view" id="chatView">
+          <aside class="chat-drawer" id="chatDrawer" aria-label="智能问答" aria-hidden="true">
+            <div class="chat-header">
+              <div>
+                <h2>智能问答</h2>
+                <p>基于当前上传和分析结果提问</p>
+              </div>
+              <button class="icon-button" id="closeChat" type="button" aria-label="关闭智能问答">×</button>
+            </div>
             <div class="chat-log" id="chatLog">
               <div class="assistant-msg">上传并分析后，可以询问“强制退市有多少条”“规则2命中了哪些口径”等问题。</div>
             </div>
             <form class="chat-box" id="chatForm">
-              <input id="questionInput" type="text" placeholder="输入关于本次上传表格的问题" />
-              <button class="primary" type="submit">提问</button>
+              <input id="questionInput" type="text" placeholder="有问题，询问我" />
+              <button class="send-button" type="submit" aria-label="提问">
+                <svg class="icon" viewBox="0 0 1024 1024" aria-hidden="true">
+                  <path d="M512 100.266667A411.733333 411.733333 0 0 0 100.266667 512 411.733333 411.733333 0 0 0 512 923.733333 411.733333 411.733333 0 0 0 923.733333 512 411.733333 411.733333 0 0 0 512 100.266667z" fill="#262D3D"></path>
+                  <path d="M707.754667 353.066667a27.733333 27.733333 0 0 0-36.608-36.608l-383.488 170.453333a27.733333 27.733333 0 0 0 2.773333 51.754667l147.84 47.274666 47.317333 147.84a27.733333 27.733333 0 0 0 51.754667 2.816l170.410667-383.530666z" fill="#FFFFFF"></path>
+                </svg>
+              </button>
             </form>
-          </section>
+          </aside>
         </section>
       </section>
     </main>
+    <div class="upload-modal" id="uploadModal" role="dialog" aria-modal="true" aria-labelledby="uploadModalTitle" hidden>
+      <div class="upload-modal-backdrop" data-close-upload></div>
+      <section class="upload-dialog">
+        <div class="modal-header">
+          <div>
+            <h2 id="uploadModalTitle">上传文件</h2>
+            <p>上传产品全量列表和收入成本明细表，预检无误后再开始分析。</p>
+          </div>
+          <button class="icon-button" id="closeUpload" type="button" aria-label="关闭上传弹窗">×</button>
+        </div>
+
+        <ol class="upload-stepper" id="uploadStepper" aria-label="上传分析步骤">
+          <li class="active" data-step="1"><span>上传文件</span></li>
+          <li data-step="2"><span>预检确认</span></li>
+        </ol>
+
+        <div class="upload-step-panel" id="uploadStepFiles">
+          <form id="uploadForm" class="modal-upload-panel">
+            <label class="file-field">
+              <input id="analysisFiles" name="analysisFiles" type="file" accept=".xlsx,.xls,.xlsm" multiple required />
+              <span class="upload-card" aria-hidden="true">
+                <span class="upload-icon" id="analysisFilesIcon">
+                  <svg viewBox="0 0 1024 1024" aria-hidden="true">
+                    <path d="M341.333333 337.066667l115.2-115.2c8.533333-8.533333 17.066667-12.8 29.866667-17.066667v473.6c0 17.066667 12.8 29.866667 25.6 29.866667s25.6-12.8 25.6-29.866667V204.8c8.533333 4.266667 21.333333 8.533333 29.866667 17.066667L682.666667 337.066667c4.266667 4.266667 12.8 8.533333 21.333333 8.533333s12.8-4.266667 21.333333-8.533333c12.8-12.8 12.8-29.866667 0-38.4l-115.2-115.2C554.666667 132.266667 469.333333 132.266667 418.133333 183.466667L302.933333 298.666667c-12.8 12.8-12.8 29.866667 0 38.4s25.6 12.8 38.4 0z" fill="currentColor"></path>
+                    <path d="M844.8 546.133333c-17.066667 0-29.866667 12.8-29.866667 25.6v170.666667c0 42.666667-34.133333 76.8-76.8 76.8H285.866667c-42.666667 0-76.8-34.133333-76.8-76.8v-170.666667c0-17.066667-12.8-25.6-25.6-25.6s-25.6 12.8-25.6 25.6v170.666667c0 72.533333 59.733333 132.266667 132.266666 132.266667h456.533334c72.533333 0 132.266667-59.733333 132.266666-132.266667v-170.666667c-4.266667-12.8-17.066667-25.6-34.133333-25.6z" fill="currentColor"></path>
+                  </svg>
+                </span>
+                <span class="upload-copy">
+                  <strong>选择文件</strong>
+                  <small id="analysisFileList">支持 .xlsx、.xls、.xlsm，最多 12 个文件，单个不超过 100MB；系统会自动识别产品列表和收入成本明细表</small>
+                </span>
+              </span>
+            </label>
+          </form>
+          <div class="selected-file-list" id="selectedFileList" aria-label="已选择文件"></div>
+        </div>
+
+        <div class="upload-step-panel" id="uploadStepInspection" hidden>
+          <div class="modal-loading" id="inspectionLoading" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            <span>正在预检文件，请稍候...</span>
+          </div>
+          <div class="inspection-panel" id="inspectionPanel" hidden></div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="secondary" id="cancelUpload" type="button">取消</button>
+          <button class="secondary" id="backToFiles" type="button" hidden>上一步</button>
+          <button class="secondary disabled" id="inspectUpload" type="button">开始预检</button>
+          <button class="primary disabled" id="confirmAnalysis" type="button">开始分析</button>
+        </div>
+      </section>
+    </div>
     <script src="/app.js" type="module"></script>
   </body>
 </html>
