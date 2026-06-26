@@ -412,10 +412,10 @@ function createAiContext(payload) {
         退市类型分布: payload.metadata.delisting_type_counts,
         命中规则分布: payload.metadata.rule_counts,
         候选状态分布: payload.metadata.candidate_status_counts,
-        退市中缺少审批完成时间数量: payload.metadata.missing_rule4_approval_count || 0,
+        无法判断规则4数量: payload.metadata.missing_rule4_approval_count || 0,
       },
       样例明细: payload.rows.slice(0, 80),
-      退市中缺少审批完成时间样例: (payload.missing_rule4_approval_rows || []).slice(0, 40),
+      无法判断的产品样例: (payload.missing_rule4_approval_rows || []).slice(0, 40),
     },
     null,
     2,
@@ -433,11 +433,11 @@ function answerLocally(question, payload) {
   if (/规则\s*1|规则一/.test(q)) return `规则1命中 ${payload.metadata.rule_counts["1"] || 0} 条。`;
   if (/规则\s*2|规则二/.test(q)) return `规则2命中 ${payload.metadata.rule_counts["2"] || 0} 条。`;
   if (/规则\s*3|规则三/.test(q)) return `规则3命中 ${payload.metadata.rule_counts["3"] || 0} 条。`;
-  if (/缺少|缺失|没有/.test(q) && /审批|退市审批|完成时间/.test(q)) {
-    return `退市中但缺少退市审批完成时间 ${payload.metadata.missing_rule4_approval_count || 0} 条。`;
+  if (/无法判断|缺少|缺失|没有/.test(q) && /审批|退市审批|完成时间|规则\s*4|规则四/.test(q)) {
+    return `无法判断规则4的产品 ${payload.metadata.missing_rule4_approval_count || 0} 条；这些产品状态为退市中，因缺少退市审批完成时间，无法判断是否退市中超过1年。`;
   }
   if (/规则\s*4|规则四|退市中/.test(q)) {
-    return `规则4命中 ${payload.metadata.rule_counts["4"] || 0} 条；另有 ${payload.metadata.missing_rule4_approval_count || 0} 条退市中产品缺少退市审批完成时间，未纳入规则4判断。`;
+    return `规则4命中 ${payload.metadata.rule_counts["4"] || 0} 条；另有 ${payload.metadata.missing_rule4_approval_count || 0} 条产品因缺少退市审批完成时间而无法判断规则4。`;
   }
   if (/已入库/.test(q)) {
     return `候选结果中“已入库”状态 ${payload.metadata.candidate_status_counts["已入库"] || 0} 条。`;

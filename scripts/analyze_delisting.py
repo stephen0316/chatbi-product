@@ -744,7 +744,7 @@ def build_candidates(
                         "产品收入": decimal_to_number(product_revenue),
                         "产品毛利": decimal_to_number(product_gross_profit),
                         "退市审批完成时间": product.get("退市审批完成时间", ""),
-                        "问题": "缺少退市审批完成时间，无法判断是否退市中超过1年",
+                        "问题": "缺少退市审批完成时间，无法判断规则4",
                     }
                 )
             elif approval_completed_date < RULE4_APPROVAL_BEFORE:
@@ -885,7 +885,7 @@ def write_output_workbook(payload: dict[str, Any], output_path: Path) -> None:
         ["规则1/2/3状态范围", "、".join(metadata["active_statuses_for_rules_1_to_3"])],
         ["规则4状态范围", "退市中；且退市审批完成时间超过1年"],
         ["候选总数", metadata["candidate_count"]],
-        ["退市中缺少审批完成时间数量", metadata.get("missing_rule4_approval_count", 0)],
+        ["无法判断规则4数量", metadata.get("missing_rule4_approval_count", 0)],
         ["强制退市数量", metadata["delisting_type_counts"].get("强制退市", 0)],
         ["建议退市数量", metadata["delisting_type_counts"].get("建议退市", 0)],
         ["规则1命中数", metadata["rule_counts"].get("1", 0)],
@@ -927,7 +927,7 @@ def write_output_workbook(payload: dict[str, Any], output_path: Path) -> None:
     add_table(rules, rules.dimensions, "RuleSummaryTable")
 
     missing_approval_rows = payload.get("missing_rule4_approval_rows", [])
-    missing_sheet = workbook.create_sheet("退市中缺审批时间")
+    missing_sheet = workbook.create_sheet("无法判断的产品")
     missing_headers = [
         "产品编码",
         "产品名称",

@@ -25,43 +25,40 @@
         <section class="analysis-area" id="analysisArea">
           <section class="main-panel">
             <div class="summary-grid" id="summaryGrid">
-              <div class="metric"><span class="metric-title">符合退市条件的产品</span><strong>-</strong></div>
-              <div class="metric">
-                <span class="metric-title">
-                  强制退市
-                  <span class="metric-help">
-                    <span class="help-icon" aria-label="强制退市规则">
-                      <svg class="icon" viewBox="0 0 1024 1024" aria-hidden="true">
-                        <path d="M512 64C264.58 64 64 264.58 64 512s200.58 448 448 448c247.31-0.28 447.72-200.69 448-448 0-247.42-200.58-448-448-448z m0 832c-212.08 0-384-171.92-384-384s171.92-384 384-384c211.97 0.25 383.75 172.02 384 384 0 212.08-171.92 384-384 384z" fill="#a1a3a5"></path>
-                        <path d="M512.38 768c-17.67 0-32-14.33-32-32V448c0-17.67 14.33-32 32-32s32 14.33 32 32v288c0 17.67-14.32 32-32 32zM512 332.8c-21.21 0-38.4-17.19-38.4-38.4 0-21.21 17.19-38.4 38.4-38.4 21.21 0 38.4 17.19 38.4 38.4 0 21.21-17.19 38.4-38.4 38.4z" fill="#a1a3a5"></path>
-                      </svg>
-                    </span>
-                    <span class="tooltip">规则 1：已上市/已入库但未出现在收入及直接成本明细表<br />规则 2：创建时间超过2年，且2年内产品收入为0</span>
-                  </span>
-                </span>
-                <strong>-</strong>
+              <div class="metric metric-with-action">
+                <div>
+                  <span class="metric-title">符合退市条件的产品</span>
+                  <strong class="metric-value">-</strong>
+                </div>
+                <div class="rule-help">
+                  <button class="rule-help-button" type="button">规则口径</button>
+                  <div class="rule-tooltip" role="tooltip">
+                    <h3>退市规则口径</h3>
+                    <div class="rule-list">
+                      <div><strong>规则 1：</strong>已上市/已入库，但未出现在收入及直接成本明细表。</div>
+                      <div><strong>规则 2：</strong>已上市/已入库，创建时间超过 2 年，且 2 年内产品收入为 0。</div>
+                      <div><strong>规则 3：</strong>已上市/已入库，创建时间超过 2 年，且 2 年内产品毛利 ≤ 0。</div>
+                      <div><strong>规则 4：</strong>退市中，且退市审批完成时间超过 1 年。</div>
+                    </div>
+                    <p>无法判断：退市中但缺少退市审批完成时间，无法判断是否超过 1 年。</p>
+                  </div>
+                </div>
               </div>
-              <div class="metric">
-                <span class="metric-title">
-                  建议退市
-                  <span class="metric-help">
-                    <span class="help-icon" aria-label="建议退市规则">
-                      <svg class="icon" viewBox="0 0 1024 1024" aria-hidden="true">
-                        <path d="M512 64C264.58 64 64 264.58 64 512s200.58 448 448 448c247.31-0.28 447.72-200.69 448-448 0-247.42-200.58-448-448-448z m0 832c-212.08 0-384-171.92-384-384s171.92-384 384-384c211.97 0.25 383.75 172.02 384 384 0 212.08-171.92 384-384 384z" fill="#a1a3a5"></path>
-                        <path d="M512.38 768c-17.67 0-32-14.33-32-32V448c0-17.67 14.33-32 32-32s32 14.33 32 32v288c0 17.67-14.32 32-32 32zM512 332.8c-21.21 0-38.4-17.19-38.4-38.4 0-21.21 17.19-38.4 38.4-38.4 21.21 0 38.4 17.19 38.4 38.4 0 21.21-17.19 38.4-38.4 38.4z" fill="#a1a3a5"></path>
-                      </svg>
-                    </span>
-                    <span class="tooltip">规则 3：创建时间超过2年，且2年内产品毛利≤0<br />规则 4：处于“退市中”状态超过 1 年</span>
-                  </span>
-                </span>
-                <strong>-</strong>
+              <div class="metric"><span class="metric-title">强制退市</span><strong class="metric-value">-</strong></div>
+              <div class="metric"><span class="metric-title">建议退市</span><strong class="metric-value">-</strong></div>
+            </div>
+            <div class="unjudged-notice" id="missingApprovalNotice" role="button" tabindex="-1" aria-disabled="true" aria-pressed="false" hidden>
+              <div>
+                <span class="unjudged-title">无法判断的产品 <strong id="missingApprovalCount">-</strong></span>
+              </div>
+              <div class="unjudged-side">
+                <span id="missingApprovalAction">查看</span>
               </div>
             </div>
 
             <div class="result-tools">
               <input id="searchInput" type="search" placeholder="搜索产品编码、名称、部门" />
               <div class="result-actions">
-                <button class="secondary missing-approval-button disabled" id="missingApprovalToggle" type="button">缺审批时间</button>
                 <a class="secondary export-button disabled" id="downloadLink" href="/api/download">全部导出</a>
                 <button class="chat-toggle" id="openChat" type="button" aria-controls="chatDrawer" aria-expanded="false">
                   <span class="chat-toggle-icon" aria-hidden="true">AI</span>

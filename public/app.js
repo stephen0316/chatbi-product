@@ -12,7 +12,9 @@ const uploadStepFiles = document.querySelector("#uploadStepFiles");
 const uploadStepInspection = document.querySelector("#uploadStepInspection");
 const toast = document.querySelector("#toast");
 const downloadLink = document.querySelector("#downloadLink");
-const missingApprovalToggle = document.querySelector("#missingApprovalToggle");
+const missingApprovalNotice = document.querySelector("#missingApprovalNotice");
+const missingApprovalCount = document.querySelector("#missingApprovalCount");
+const missingApprovalAction = document.querySelector("#missingApprovalAction");
 const resultBody = document.querySelector("#resultBody");
 const summaryGrid = document.querySelector("#summaryGrid");
 const searchInput = document.querySelector("#searchInput");
@@ -186,8 +188,14 @@ function setDownloadEnabled(enabled) {
 
 function updateMissingApprovalToggle() {
   const count = missingApprovalRows.length || metadata?.missing_rule4_approval_count || 0;
-  missingApprovalToggle.classList.toggle("disabled", count === 0);
-  missingApprovalToggle.textContent = showingMissingApproval ? "返回结果列表" : `缺审批时间 ${count}`;
+  missingApprovalNotice.hidden = count === 0;
+  missingApprovalCount.textContent = count;
+  missingApprovalAction.textContent = showingMissingApproval ? "返回" : "查看";
+  missingApprovalNotice.classList.toggle("disabled", count === 0);
+  missingApprovalNotice.classList.toggle("active", showingMissingApproval);
+  missingApprovalNotice.setAttribute("aria-disabled", String(count === 0));
+  missingApprovalNotice.setAttribute("aria-pressed", String(showingMissingApproval));
+  missingApprovalNotice.tabIndex = count === 0 ? -1 : 0;
 }
 
 function formatFileNames(files) {
@@ -251,9 +259,14 @@ function setUploadOpen(isOpen) {
     if (!selectedAnalysisFiles.length) {
       clearUploadQueue();
     }
-    setUploadStep(1);
+    const initialStep = canAnalyzeInspection(pendingInspection) ? 2 : 1;
+    setUploadStep(initialStep);
     renderSelectedFiles();
-    window.setTimeout(() => analysisFiles.focus(), 80);
+    if (initialStep === 1) {
+      window.setTimeout(() => analysisFiles.focus(), 80);
+    } else {
+      window.setTimeout(() => confirmAnalysis.focus(), 80);
+    }
   } else {
     openUpload.focus();
   }
@@ -430,7 +443,7 @@ function removeSelectedFile(index) {
 }
 
 function renderSummary() {
-  const metrics = summaryGrid.querySelectorAll(".metric strong");
+  const metrics = summaryGrid.querySelectorAll(".metric-value");
   if (!metadata) {
     metrics.forEach((metric) => {
       metric.textContent = "-";
@@ -462,7 +475,7 @@ function renderRows() {
   const rows = sourceRows.filter((row) => rowMatches(row, query)).slice(0, 500);
 
   if (!rows.length) {
-    const text = showingMissingApproval ? "没有缺少退市审批完成时间的产品" : "没有匹配的结果";
+    const text = showingMissingApproval ? "没有无法判断的产品" : "没有匹配的结果";
     resultBody.innerHTML = `<tr><td colspan="9" class="empty">${text}</td></tr>`;
     return;
   }
@@ -480,7 +493,7 @@ function renderRows() {
           <td>${escapeHtml(row["部门"])}</td>
           <td class="num">${formatNumber(row["产品收入"])}</td>
           <td class="num">${formatNumber(row["产品毛利"])}</td>
-          <td><span class="badge ${badgeClass}">${escapeHtml(isMissingApproval ? "待补充" : row["退市类型"])}</span></td>
+          <td><span class="badge ${badgeClass}">${escapeHtml(isMissingApproval ? "无法判断" : row["退市类型"])}</span></td>
           <td>${escapeHtml(isMissingApproval ? row["问题"] : formatReason(row["理由"]))}</td>
         </tr>
       `;
@@ -567,11 +580,18 @@ confirmAnalysis.addEventListener("click", async () => {
 });
 
 searchInput.addEventListener("input", renderRows);
-missingApprovalToggle.addEventListener("click", () => {
-  if (missingApprovalToggle.classList.contains("disabled")) return;
+function toggleMissingApprovalRows() {
+  if (missingApprovalNotice.classList.contains("disabled")) return;
   showingMissingApproval = !showingMissingApproval;
   updateMissingApprovalToggle();
   renderRows();
+}
+
+missingApprovalNotice.addEventListener("click", toggleMissingApprovalRows);
+missingApprovalNotice.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  toggleMissingApprovalRows();
 });
 analysisFiles.addEventListener("change", () => {
   const changed = addSelectedFiles(analysisFiles.files);
