@@ -2,6 +2,12 @@
 
 本应用用于上传「产品全量列表」和「收入及直接成本明细表」，自动生成退市筛选结果，并支持基于本次上传数据进行问答。
 
+## 文档
+
+- [桌面部署方案](docs/desktop-deployment-plan.md)
+- [Windows 桌面版打包操作手册](docs/windows-electron-build-manual.md)
+- [macOS 桌面版打包操作手册](docs/macos-electron-build-manual.md)
+
 ## 启动
 
 ```bash
@@ -25,6 +31,59 @@ GEMINI_API_KEY=your_key_here
 ```
 
 未配置 `GEMINI_API_KEY` 时，系统仍支持常见统计类本地问答，例如强制退市数量、规则命中数量等。
+
+## Windows 桌面版打包
+
+桌面版目标是交付 Windows x64 绿色包，客户解压后双击 `ChatBI.exe` 使用，不需要安装 Node、Python 或额外依赖。
+
+推荐在 Windows x64 或 Windows CI 中执行：
+
+```bash
+npm install
+cp .env.example .env
+npm run package:python-win
+npm run build:win
+```
+
+构建前需要在 `.env` 中写入 `GEMINI_API_KEY`。构建脚本会生成 `build/electron/embedded-config.json`，并将 key 作为 Electron 资源打入安装包，不会暴露到前端代码。注意：内置 key 无法做到绝对保密，安装包被逆向后仍存在泄露风险。
+
+Windows 产物：
+
+```text
+dist/ChatBI-win-x64.zip
+```
+
+桌面版运行数据写入 Electron `userData` 目录下的 `storage`，即 Windows 上通常位于：
+
+```text
+%APPDATA%/ChatBI/storage
+```
+
+上传文件、预检结果、分析结果和导出文件按 session 隔离保存，并沿用 3 天自动清理机制。
+
+## macOS 桌面版打包
+
+macOS 桌面版会把 Python 分析脚本封装成原生可执行文件，客户不需要安装 Python。
+
+推荐在目标架构一致的 macOS 机器上执行。例如 Apple Silicon 客户用 arm64 Mac 打包，Intel 客户用 x64 Mac 打包。
+
+```bash
+npm install
+cp .env.example .env
+npm run package:analyzer-mac
+npm run build:mac
+```
+
+构建前同样需要在 `.env` 中写入 `GEMINI_API_KEY`。
+
+macOS 产物：
+
+```text
+dist/ChatBI-mac-arm64.zip
+dist/ChatBI-mac-x64.zip
+```
+
+实际文件名取决于打包机器架构。当前配置生成 zip 包，不做签名和 notarization；首次打开时 macOS 可能提示来自未知开发者，需要在系统设置中允许打开。若要正式对外分发，建议后续补充 Apple Developer ID 签名和 notarization。
 
 ## 本地缓存
 

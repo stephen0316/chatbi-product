@@ -32,6 +32,9 @@ const backToFiles = document.querySelector("#backToFiles");
 const uploadModal = document.querySelector("#uploadModal");
 const mainPanel = document.querySelector(".main-panel");
 const listLoading = document.querySelector("#listLoading");
+const loadingCodeStream = document.querySelector(".code-stream");
+const loadingCodeLineNodes = loadingCodeStream ? Array.from(loadingCodeStream.querySelectorAll("span")) : [];
+const loadingCodeLines = loadingCodeLineNodes.map((node) => node.textContent);
 
 let allRows = [];
 let missingApprovalRows = [];
@@ -42,6 +45,8 @@ let pendingInspection = null;
 let inspectionRequestId = 0;
 let selectedAnalysisFiles = [];
 let uploadStep = 1;
+let loadingCodeTimer = null;
+let loadingCodeRunId = 0;
 
 const analysisFilesHint = "支持 .xlsx、.xls、.xlsm，最多 12 个文件，单个不超过 100MB；系统会自动识别产品列表和收入成本明细表";
 const PUBLIC_FIELD_LABELS = {
@@ -284,10 +289,80 @@ function setInspectionLoading(isLoading) {
   confirmAnalysis.classList.toggle("disabled", isLoading || !canAnalyzeInspection(pendingInspection));
 }
 
+function stopLoadingCode() {
+  loadingCodeRunId += 1;
+  window.clearTimeout(loadingCodeTimer);
+  loadingCodeTimer = null;
+  loadingCodeLineNodes.forEach((node, index) => {
+    node.textContent = loadingCodeLines[index] || "";
+    node.classList.remove("is-active");
+    node.classList.add("is-typed");
+  });
+}
+
+function renderLoadingCodeLine(node, text, showCaret) {
+  node.textContent = text;
+  if (!showCaret) return;
+  const caret = document.createElement("span");
+  caret.className = "typing-caret";
+  caret.setAttribute("aria-hidden", "true");
+  caret.textContent = "\u00a0";
+  node.appendChild(caret);
+}
+
+function startLoadingCode() {
+  if (!loadingCodeLineNodes.length) return;
+  const runId = ++loadingCodeRunId;
+  window.clearTimeout(loadingCodeTimer);
+  loadingCodeLineNodes.forEach((node) => {
+    node.textContent = "";
+    node.classList.remove("is-active", "is-typed");
+  });
+  loadingCodeStream.scrollTop = 0;
+
+  let lineIndex = 0;
+  let charIndex = 0;
+  const tick = () => {
+    if (runId !== loadingCodeRunId) return;
+    if (lineIndex >= loadingCodeLines.length) {
+      loadingCodeTimer = window.setTimeout(() => {
+        if (runId === loadingCodeRunId) startLoadingCode();
+      }, 720);
+      return;
+    }
+
+    const node = loadingCodeLineNodes[lineIndex];
+    const code = loadingCodeLines[lineIndex] || "";
+    node.classList.add("is-active");
+    renderLoadingCodeLine(node, code.slice(0, charIndex), true);
+    loadingCodeStream.scrollTop = loadingCodeStream.scrollHeight;
+
+    if (charIndex < code.length) {
+      charIndex += 1;
+      loadingCodeTimer = window.setTimeout(tick, 18);
+      return;
+    }
+
+    node.classList.remove("is-active");
+    node.classList.add("is-typed");
+    node.textContent = code;
+    lineIndex += 1;
+    charIndex = 0;
+    loadingCodeTimer = window.setTimeout(tick, 130);
+  };
+
+  tick();
+}
+
 function setListLoading(isLoading) {
   mainPanel.classList.toggle("is-loading", isLoading);
   mainPanel.setAttribute("aria-busy", String(isLoading));
   listLoading.hidden = !isLoading;
+  if (isLoading) {
+    startLoadingCode();
+  } else {
+    stopLoadingCode();
+  }
 }
 
 function clearUploadQueue() {
@@ -664,10 +739,15 @@ function addMessage(className, text, options = {}) {
   return node;
 }
 
+function clearChatHint() {
+  chatLog.querySelector(".chat-hint")?.remove();
+}
+
 chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const question = questionInput.value.trim();
   if (!question) return;
+  clearChatHint();
   addMessage("user-msg", question);
   questionInput.value = "";
   const pending = addMessage("assistant-msg", "正在分析...");

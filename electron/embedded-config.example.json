@@ -1,0 +1,4 @@
+{
+  "geminiApiKey": "replace_with_real_key_before_build",
+  "geminiModel": "gemini-2.5-flash"
+}

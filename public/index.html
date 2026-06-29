@@ -16,9 +16,12 @@
               <h1>产品退市分析</h1>
               <p>上传全量产品清单与收入明细，自动生成退市建议表。</p>
             </div>
-          </div>
-          <div class="upload-entry">
-            <button class="primary upload-open" id="openUpload" type="button">上传文件</button>
+            <button class="primary upload-open" id="openUpload" type="button">
+              <svg class="button-icon" viewBox="0 0 1024 1024" aria-hidden="true" focusable="false">
+                <path d="M832 832H192a32 32 0 0 0 0 64h640a32 32 0 0 0 0-64zM858.24 444.8l-46.08 45.44L576 254.08V704H512V247.04l-243.2 243.2-44.8-45.44L540.8 128l317.44 316.8z" fill="currentColor"></path>
+              </svg>
+              <span>上传文件</span>
+            </button>
           </div>
         </section>
 
@@ -35,10 +38,10 @@
                   <div class="rule-tooltip" role="tooltip">
                     <h3>退市规则口径</h3>
                     <div class="rule-list">
-                      <div><strong>规则 1：</strong>已上市/已入库，但未出现在收入及直接成本明细表。</div>
-                      <div><strong>规则 2：</strong>已上市/已入库，创建时间超过 2 年，且 2 年内产品收入为 0。</div>
-                      <div><strong>规则 3：</strong>已上市/已入库，创建时间超过 2 年，且 2 年内产品毛利 ≤ 0。</div>
-                      <div><strong>规则 4：</strong>退市中，且退市审批完成时间超过 1 年。</div>
+                      <div><strong>规则 1：</strong>已上市/已入库，但未出现在收入及直接成本明细表。<span class="rule-type-badge force">强制退市</span></div>
+                      <div><strong>规则 2：</strong>已上市/已入库，创建时间超过 2 年，且 2 年内产品收入为 0。<span class="rule-type-badge force">强制退市</span></div>
+                      <div><strong>规则 3：</strong>已上市/已入库，创建时间超过 2 年，且 2 年内产品毛利 ≤ 0。<span class="rule-type-badge suggest">建议退市</span></div>
+                      <div><strong>规则 4：</strong>退市中，且退市审批完成时间超过 1 年。<span class="rule-type-badge suggest">建议退市</span></div>
                     </div>
                     <p>无法判断：退市中但缺少退市审批完成时间，无法判断是否超过 1 年。</p>
                   </div>
@@ -87,8 +90,28 @@
               </table>
             </div>
             <div class="list-loading" id="listLoading" hidden>
-              <span class="spinner" aria-hidden="true"></span>
-              <span>正在分析...</span>
+              <div class="loading-code" aria-hidden="true">
+                <div class="loading-code-header">
+                  <span class="code-dot"></span>
+                  <span class="code-dot"></span>
+                  <span class="code-dot"></span>
+                  <strong>compile.analysis.js</strong>
+                </div>
+                <div class="code-stream">
+                  <span style="--i: 0; --chars: 42">const files = await inspectWorkbook(queue);</span>
+                  <span style="--i: 1; --chars: 45">rules.match(product.status, revenue.window);</span>
+                  <span style="--i: 2; --chars: 43">for (const row of candidates) score(row);</span>
+                  <span style="--i: 3; --chars: 39">summary.force = countBy("强制退市");</span>
+                  <span style="--i: 4; --chars: 41">summary.suggest = countBy("建议退市");</span>
+                  <span style="--i: 5; --chars: 44">exportTable.normalize(columns).commit();</span>
+                  <span style="--i: 6; --chars: 31">chatContext.index(result.rows);</span>
+                  <span style="--i: 7; --chars: 48">cache.write("analysis-result.json", payload);</span>
+                  <span style="--i: 8; --chars: 48">workbook.sheet("退市筛选结果").append(rows);</span>
+                  <span style="--i: 9; --chars: 42">qaContext.buildVectorIndex(metadata);</span>
+                  <span style="--i: 10; --chars: 40">return report.ready({ status: "done" });</span>
+                </div>
+              </div>
+              <div class="loading-copy">别急别急，正在疯狂工作...</div>
             </div>
           </section>
 
@@ -101,7 +124,7 @@
               <button class="icon-button" id="closeChat" type="button" aria-label="关闭智能问答">×</button>
             </div>
             <div class="chat-log" id="chatLog">
-              <div class="assistant-msg">上传并分析后，可以询问“强制退市有多少条”“规则2命中了哪些口径”等问题。</div>
+              <div class="assistant-msg chat-hint">上传并分析后，可以询问“强制退市有多少条”“规则2命中了哪些口径”等问题。</div>
             </div>
             <form class="chat-box" id="chatForm">
               <input id="questionInput" type="text" placeholder="有问题，询问我" />

@@ -2,3 +2,13 @@ node_modules/
 .env
 storage/
 *.log
+dist/
+build/electron/
+build/python-win/
+build/analyzer-mac-venv/
+build/pyinstaller-mac/
+electron/embedded-config.json
+vendor/python-win/*
+!vendor/python-win/README.md
+vendor/analyzer-mac/*
+!vendor/analyzer-mac/README.md

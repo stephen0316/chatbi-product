@@ -6,7 +6,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const execFileAsync = promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
@@ -18,15 +18,20 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const DEFAULT_BUNDLED_PYTHON =
   "/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3";
 const PYTHON_BIN = process.env.PYTHON_BIN || DEFAULT_BUNDLED_PYTHON;
+const ANALYZER_BIN = process.env.CHATBI_ANALYZER_BIN || "";
 
-const STORAGE_DIR = path.join(__dirname, "storage");
+const STORAGE_DIR = process.env.CHATBI_STORAGE_DIR || process.env.STORAGE_DIR || path.join(__dirname, "storage");
 const SESSION_COOKIE = "chatbi_sid";
 const SESSIONS_DIR = path.join(STORAGE_DIR, "sessions");
 const TMP_DIR = path.join(STORAGE_DIR, "tmp");
 const SESSION_RETENTION_DAYS = Number(process.env.SESSION_RETENTION_DAYS || 3);
 const SESSION_RETENTION_MS = SESSION_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const TMP_RETENTION_MINUTES = Number(process.env.TMP_RETENTION_MINUTES || 30);
+const TMP_RETENTION_MS = TMP_RETENTION_MINUTES * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
-const ANALYZER_SCRIPT = path.join(__dirname, "scripts", "analyze_delisting.py");
+const ANALYZER_SCRIPT =
+  process.env.CHATBI_ANALYZER_SCRIPT || path.join(__dirname, "scripts", "analyze_delisting.py");
+const ANALYZER_CWD = path.dirname(ANALYZER_BIN || ANALYZER_SCRIPT);
 
 await fs.mkdir(SESSIONS_DIR, { recursive: true });
 await fs.mkdir(TMP_DIR, { recursive: true });
@@ -66,6 +71,14 @@ function safeFileName(name) {
 
 function displayUploadName(name) {
   return safeFileName(name).replace(/^pending-\d+-\d+-/, "");
+}
+
+function isIgnoredUploadFile(file) {
+  return normalize(file?.originalname).startsWith(".~");
+}
+
+async function removeUploadTempFiles(files) {
+  await Promise.all((files || []).map((file) => fs.rm(file.path, { force: true }).catch(() => {})));
 }
 
 function parseCookies(header) {
@@ -176,14 +189,17 @@ async function removeExpiredChildren(dir, cutoffMs) {
 }
 
 let cleanupRunning = false;
+let cleanupTimer = null;
 
 async function cleanupExpiredStorage() {
   if (cleanupRunning || !Number.isFinite(SESSION_RETENTION_MS) || SESSION_RETENTION_MS <= 0) return;
   cleanupRunning = true;
   try {
-    const cutoffMs = Date.now() - SESSION_RETENTION_MS;
-    const removedSessions = await removeExpiredChildren(SESSIONS_DIR, cutoffMs);
-    const removedTmpFiles = await removeExpiredChildren(TMP_DIR, cutoffMs);
+    const now = Date.now();
+    const sessionCutoffMs = now - SESSION_RETENTION_MS;
+    const tmpCutoffMs = Number.isFinite(TMP_RETENTION_MS) && TMP_RETENTION_MS > 0 ? now - TMP_RETENTION_MS : sessionCutoffMs;
+    const removedSessions = await removeExpiredChildren(SESSIONS_DIR, sessionCutoffMs);
+    const removedTmpFiles = await removeExpiredChildren(TMP_DIR, tmpCutoffMs);
     if (removedSessions || removedTmpFiles) {
       console.log(
         `Storage cleanup removed ${removedSessions} expired session(s) and ${removedTmpFiles} tmp item(s).`,
@@ -210,9 +226,25 @@ async function writeCachedPayload(paths, payload) {
   await fs.writeFile(paths.resultJson, JSON.stringify(payload, null, 2), "utf8");
 }
 
+async function runAnalyzerCli(args, errorPrefix) {
+  const command = ANALYZER_BIN || PYTHON_BIN;
+  const finalArgs = ANALYZER_BIN ? args : [ANALYZER_SCRIPT, ...args];
+  try {
+    const { stdout } = await execFileAsync(command, finalArgs, {
+      cwd: ANALYZER_CWD,
+      maxBuffer: 1024 * 1024 * 20,
+    });
+    const lastLine = stdout.trim().split("\n").filter(Boolean).at(-1);
+    return lastLine ? JSON.parse(lastLine) : { ok: true };
+  } catch (error) {
+    const detail = error.stderr || error.stdout || error.message;
+    throw new Error(`${errorPrefix}：${detail}`);
+  }
+}
+
 async function runAnalyzer(productPath, revenuePaths, paths) {
-  const args = [
-    ANALYZER_SCRIPT,
+  return runAnalyzerCli(
+    [
     "--product-list",
     productPath,
     "--revenue-files",
@@ -221,79 +253,57 @@ async function runAnalyzer(productPath, revenuePaths, paths) {
     paths.resultJson,
     "--output-xlsx",
     paths.resultXlsx,
-  ];
-  try {
-    const { stdout } = await execFileAsync(PYTHON_BIN, args, {
-      cwd: __dirname,
-      maxBuffer: 1024 * 1024 * 20,
-    });
-    const lastLine = stdout.trim().split("\n").filter(Boolean).at(-1);
-    return lastLine ? JSON.parse(lastLine) : { ok: true };
-  } catch (error) {
-    const detail = error.stderr || error.stdout || error.message;
-    throw new Error(`分析脚本执行失败：${detail}`);
-  }
+    ],
+    "分析脚本执行失败",
+  );
 }
 
 async function runInspector(filePaths, paths) {
-  const args = [
-    ANALYZER_SCRIPT,
+  return runAnalyzerCli(
+    [
     "--inspect-files",
     ...filePaths,
     "--output-json",
     paths.inspectionJson,
-  ];
-  try {
-    const { stdout } = await execFileAsync(PYTHON_BIN, args, {
-      cwd: __dirname,
-      maxBuffer: 1024 * 1024 * 20,
-    });
-    const lastLine = stdout.trim().split("\n").filter(Boolean).at(-1);
-    return lastLine ? JSON.parse(lastLine) : { ok: true };
-  } catch (error) {
-    const detail = error.stderr || error.stdout || error.message;
-    throw new Error(`预检脚本执行失败：${detail}`);
-  }
+    ],
+    "预检脚本执行失败",
+  );
 }
 
 async function runAnalyzerFromInspection(paths) {
-  const args = [
-    ANALYZER_SCRIPT,
+  return runAnalyzerCli(
+    [
     "--mapping-json",
     paths.inspectionJson,
     "--output-json",
     paths.resultJson,
     "--output-xlsx",
     paths.resultXlsx,
-  ];
-  try {
-    const { stdout } = await execFileAsync(PYTHON_BIN, args, {
-      cwd: __dirname,
-      maxBuffer: 1024 * 1024 * 20,
-    });
-    const lastLine = stdout.trim().split("\n").filter(Boolean).at(-1);
-    return lastLine ? JSON.parse(lastLine) : { ok: true };
-  } catch (error) {
-    const detail = error.stderr || error.stdout || error.message;
-    throw new Error(`分析脚本执行失败：${detail}`);
-  }
+    ],
+    "分析脚本执行失败",
+  );
 }
 
-async function callGemini(prompt, paths) {
+async function callGemini(prompt) {
   const requestBody = JSON.stringify({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.2 },
   });
-  const requestPath = path.join(paths.cache, `gemini-request-${Date.now()}.json`);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
-  await fs.writeFile(requestPath, requestBody, "utf8");
   try {
-    const { stdout } = await execFileAsync(
-      "curl",
-      ["-s", "-X", "POST", url, "-H", "Content-Type: application/json", "--data-binary", `@${requestPath}`],
-      { maxBuffer: 1024 * 1024 * 10 },
-    );
-    const data = JSON.parse(stdout);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody,
+    });
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`模型接口返回非 JSON 内容：${text.slice(0, 120)}`);
+    }
+    if (!response.ok) throw new Error(data?.error?.message || `模型接口调用失败：HTTP ${response.status}`);
     if (data?.error) throw new Error(data.error.message || "模型接口调用失败");
     return (
       data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim() ||
@@ -301,8 +311,6 @@ async function callGemini(prompt, paths) {
     );
   } catch (error) {
     throw new Error(error.message || "模型接口调用失败");
-  } finally {
-    await fs.rm(requestPath, { force: true }).catch(() => {});
   }
 }
 
@@ -461,7 +469,9 @@ app.post("/api/inspect-upload", upload.array("analysisFiles", 12), async (req, r
   const savedPaths = [];
   const paths = req.sessionPaths;
   try {
-    const files = uploadedFiles.filter((file) => !file.originalname.startsWith(".~"));
+    const ignoredFiles = uploadedFiles.filter(isIgnoredUploadFile);
+    const files = uploadedFiles.filter((file) => !isIgnoredUploadFile(file));
+    await removeUploadTempFiles(ignoredFiles);
     if (!files.length) throw new Error("请至少上传一份 Excel 文件");
 
     await resetSessionStorage(paths);
@@ -537,10 +547,10 @@ app.post(
       ...(req.files?.revenueFiles || []),
     ];
     try {
-      const productFile = req.files?.productList?.[0];
-      const revenueFiles = (req.files?.revenueFiles || []).filter(
-        (file) => !file.originalname.startsWith(".~"),
-      );
+      const ignoredFiles = uploadedFiles.filter(isIgnoredUploadFile);
+      await removeUploadTempFiles(ignoredFiles);
+      const productFile = (req.files?.productList || []).filter((file) => !isIgnoredUploadFile(file))[0];
+      const revenueFiles = (req.files?.revenueFiles || []).filter((file) => !isIgnoredUploadFile(file));
       if (!productFile) throw new Error("请上传产品全量列表");
       if (!revenueFiles.length) throw new Error("请至少上传一份收入及直接成本明细表");
 
@@ -642,10 +652,34 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-await cleanupExpiredStorage();
-setInterval(cleanupExpiredStorage, CLEANUP_INTERVAL_MS).unref();
+export async function startServer(options = {}) {
+  const port = Number(options.port ?? PORT);
+  const host = options.host;
+  await cleanupExpiredStorage();
+  if (!cleanupTimer) {
+    cleanupTimer = setInterval(cleanupExpiredStorage, CLEANUP_INTERVAL_MS);
+    cleanupTimer.unref?.();
+  }
 
-app.listen(PORT, () => {
-  console.log(`Product delisting app listening on http://localhost:${PORT}`);
-  console.log(GEMINI_API_KEY ? "Gemini Q&A enabled." : "Gemini Q&A disabled: set GEMINI_API_KEY in .env.");
-});
+  return new Promise((resolve, reject) => {
+    const server = app.listen(port, host, () => {
+      const address = server.address();
+      const actualPort = typeof address === "object" && address ? address.port : port;
+      const actualHost = host || "localhost";
+      console.log(`Product delisting app listening on http://${actualHost}:${actualPort}`);
+      console.log(GEMINI_API_KEY ? "Gemini Q&A enabled." : "Gemini Q&A disabled: set GEMINI_API_KEY in .env.");
+      resolve({ app, server, port: actualPort, host: actualHost });
+    });
+    server.once("error", reject);
+  });
+}
+
+export { app };
+
+function isMainModule() {
+  return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+}
+
+if (isMainModule()) {
+  await startServer();
+}

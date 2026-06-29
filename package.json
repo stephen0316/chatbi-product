@@ -3,13 +3,88 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "electron:dev": "electron .",
+    "package:python-win": "node scripts/package_python_win.mjs",
+    "package:analyzer-mac": "node scripts/package_analyzer_mac.mjs",
+    "build:win": "node scripts/prepare_electron_config.mjs --platform=win && electron-builder --win zip --x64",
+    "build:mac": "node scripts/prepare_electron_config.mjs --platform=mac && electron-builder --mac zip"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "multer": "^2.2.0"
+  },
+  "devDependencies": {
+    "electron": "^42.5.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.chatbi.product-delisting",
+    "productName": "ChatBI",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "public/**/*",
+      "server.js",
+      "package.json",
+      "node_modules/**/*",
+      "!electron/embedded-config*.json",
+      "!storage/**/*",
+      "!outputs/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/python-win",
+        "to": "python-win",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "scripts",
+        "to": "scripts",
+        "filter": [
+          "analyze_delisting.py"
+        ]
+      },
+      {
+        "from": "vendor/analyzer-mac",
+        "to": "analyzer-mac",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "build/electron/embedded-config.json",
+        "to": "embedded-config.json"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "ChatBI-win-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "zip"
+        }
+      ],
+      "category": "public.app-category.business",
+      "artifactName": "ChatBI-mac-${arch}.${ext}"
+    }
   }
 }
