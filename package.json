@@ -24,7 +24,7 @@
   },
   "build": {
     "appId": "com.chatbi.product-delisting",
-    "productName": "ChatBI",
+    "productName": "产品清退官",
     "asar": true,
     "directories": {
       "output": "dist"
@@ -75,7 +75,7 @@
           ]
         }
       ],
-      "artifactName": "ChatBI-win-${arch}.${ext}"
+      "artifactName": "产品清退官-win-${arch}.${ext}"
     },
     "mac": {
       "target": [
@@ -84,7 +84,7 @@
         }
       ],
       "category": "public.app-category.business",
-      "artifactName": "ChatBI-mac-${arch}.${ext}"
+      "artifactName": "产品清退官-mac-${arch}.${ext}"
     }
   }
 }
