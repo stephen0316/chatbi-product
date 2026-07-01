@@ -9,13 +9,13 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates python3 python3-venv \
   && rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m venv /opt/chatbi-venv
+RUN python3 -m venv /opt/product-huizhen-venv
 
 ENV NODE_ENV=production \
   PORT=3000 \
-  PYTHON_BIN=/opt/chatbi-venv/bin/python \
+  PYTHON_BIN=/opt/product-huizhen-venv/bin/python \
   CHATBI_STORAGE_DIR=/app/storage \
-  PATH=/opt/chatbi-venv/bin:$PATH
+  PATH=/opt/product-huizhen-venv/bin:$PATH
 
 COPY package*.json ./
 

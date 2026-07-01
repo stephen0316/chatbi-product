@@ -1,6 +1,6 @@
-# ChatBI Docker 部署交付手册
+# 产品慧诊 Docker 部署交付手册
 
-本文用于交付给公司内网研发部署 Web 服务版 ChatBI。Docker 版不包含 Electron 桌面壳，适合部署在公司内网服务器，通过浏览器访问。
+本文用于交付给公司内网研发部署 Web 服务版产品慧诊。Docker 版不包含 Electron 桌面壳，适合部署在公司内网服务器，通过浏览器访问。
 
 ## 1. 部署前提
 
@@ -58,7 +58,7 @@ GEMINI_MODEL=gemini-2.5-flash
 ### 3.2 构建镜像
 
 ```bash
-docker build -t chatbi:latest .
+docker build -t product-huizhen:latest .
 ```
 
 如果需要使用公司 npm / pip 镜像源：
@@ -67,7 +67,7 @@ docker build -t chatbi:latest .
 docker build \
   --build-arg NPM_REGISTRY=https://registry.npmmirror.com \
   --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-  -t chatbi:latest .
+  -t product-huizhen:latest .
 ```
 
 ### 3.3 启动服务
@@ -86,7 +86,7 @@ http://服务器IP:3001
 
 ```bash
 docker compose ps
-docker compose logs -f chatbi
+docker compose logs -f product-huizhen
 curl http://127.0.0.1:3001/api/status
 ```
 
@@ -99,20 +99,20 @@ curl http://127.0.0.1:3001/api/status
 ### 4.1 在可联网机器上构建镜像
 
 ```bash
-docker build -t chatbi:latest .
-docker save chatbi:latest -o chatbi-latest.tar
+docker build -t product-huizhen:latest .
+docker save product-huizhen:latest -o product-huizhen-latest.tar
 ```
 
 把以下文件交付给内网研发：
 
-- `chatbi-latest.tar`
+- `product-huizhen-latest.tar`
 - `docker-compose.yml`
 - `.env.docker.example`
 
 ### 4.2 在内网服务器加载镜像
 
 ```bash
-docker load -i chatbi-latest.tar
+docker load -i product-huizhen-latest.tar
 cp .env.docker.example .env
 vi .env
 docker compose up -d
@@ -129,7 +129,7 @@ http://服务器IP:3001
 Docker Compose 默认使用命名卷：
 
 ```text
-chatbi-storage
+product-huizhen-storage
 ```
 
 容器内路径：
@@ -145,18 +145,18 @@ SESSION_RETENTION_DAYS=3
 TMP_RETENTION_MINUTES=30
 ```
 
-如需改成服务器固定目录，例如 `/data/chatbi/storage`，把 `docker-compose.yml` 中的 volume 改为：
+如需改成服务器固定目录，例如 `/data/product-huizhen/storage`，把 `docker-compose.yml` 中的 volume 改为：
 
 ```yaml
 volumes:
-  - /data/chatbi/storage:/app/storage
+  - /data/product-huizhen/storage:/app/storage
 ```
 
 并在服务器上执行：
 
 ```bash
-mkdir -p /data/chatbi/storage
-chown -R 1000:1000 /data/chatbi/storage
+mkdir -p /data/product-huizhen/storage
+chown -R 1000:1000 /data/product-huizhen/storage
 ```
 
 ## 6. 常用运维命令
@@ -176,13 +176,13 @@ docker compose down
 查看日志：
 
 ```bash
-docker compose logs -f chatbi
+docker compose logs -f product-huizhen
 ```
 
 重启：
 
 ```bash
-docker compose restart chatbi
+docker compose restart product-huizhen
 ```
 
 更新镜像后重启：

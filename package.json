@@ -1,5 +1,5 @@
 {
-  "name": "chatbi-product-delisting",
+  "name": "product-huizhen",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -23,8 +23,8 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.chatbi.product-delisting",
-    "productName": "产品清退官",
+    "appId": "com.producthuizhen.app",
+    "productName": "产品慧诊",
     "asar": true,
     "directories": {
       "output": "dist"
@@ -75,7 +75,7 @@
           ]
         }
       ],
-      "artifactName": "产品清退官-win-${arch}.${ext}"
+      "artifactName": "产品慧诊-win-${arch}.${ext}"
     },
     "mac": {
       "target": [
@@ -84,7 +84,7 @@
         }
       ],
       "category": "public.app-category.business",
-      "artifactName": "产品清退官-mac-${arch}.${ext}"
+      "artifactName": "产品慧诊-mac-${arch}.${ext}"
     }
   }
 }

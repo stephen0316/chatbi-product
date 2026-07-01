@@ -111,7 +111,7 @@ function createWindow(port) {
     height: 900,
     minWidth: 1100,
     minHeight: 720,
-    title: "产品清退官",
+    title: "产品慧诊",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -161,7 +161,7 @@ async function bootstrap() {
 }
 
 app.whenReady().then(bootstrap).catch((error) => {
-  dialog.showErrorBox("产品清退官启动失败", error.message || String(error));
+  dialog.showErrorBox("产品慧诊启动失败", error.message || String(error));
   app.quit();
 });
 

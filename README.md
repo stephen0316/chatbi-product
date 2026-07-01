@@ -1,6 +1,6 @@
-# 产品清退官
+# 产品慧诊
 
-产品清退官用于上传「产品全量列表」和「收入及直接成本明细表」，自动识别清退候选、生成退市建议表，并支持基于本次上传数据进行问答。
+产品慧诊用于上传「产品全量列表」和「收入及直接成本明细表」，自动识别清退候选、生成退市建议表，并支持基于本次上传数据进行问答。
 
 ## 文档
 
@@ -29,7 +29,7 @@ http://localhost:3000
 
 ```bash
 cp .env.docker.example .env
-docker build -t chatbi:latest .
+docker build -t product-huizhen:latest .
 docker compose up -d
 ```
 
@@ -42,7 +42,7 @@ http://服务器IP:3001
 离线内网部署可先在可联网机器构建并导出镜像：
 
 ```bash
-docker save chatbi:latest -o chatbi-latest.tar
+docker save product-huizhen:latest -o product-huizhen-latest.tar
 ```
 
 详细步骤见 [Docker 内网部署交付手册](docs/docker-deployment-guide.md)。
@@ -59,7 +59,7 @@ GEMINI_API_KEY=your_key_here
 
 ## Windows 桌面版打包
 
-桌面版目标是交付 Windows x64 绿色包，客户解压后双击 `产品清退官.exe` 使用，不需要安装 Node、Python 或额外依赖。
+桌面版目标是交付 Windows x64 绿色包，客户解压后双击 `产品慧诊.exe` 使用，不需要安装 Node、Python 或额外依赖。
 
 推荐在 Windows x64 或 Windows CI 中执行：
 
@@ -75,13 +75,13 @@ npm run build:win
 Windows 产物：
 
 ```text
-dist/产品清退官-win-x64.zip
+dist/产品慧诊-win-x64.zip
 ```
 
 桌面版运行数据写入 Electron `userData` 目录下的 `storage`，即 Windows 上通常位于：
 
 ```text
-%APPDATA%/产品清退官/storage
+%APPDATA%/产品慧诊/storage
 ```
 
 上传文件、预检结果、分析结果和导出文件按 session 隔离保存，并沿用 3 天自动清理机制。
@@ -104,8 +104,8 @@ npm run build:mac
 macOS 产物：
 
 ```text
-dist/产品清退官-mac-arm64.zip
-dist/产品清退官-mac-x64.zip
+dist/产品慧诊-mac-arm64.zip
+dist/产品慧诊-mac-x64.zip
 ```
 
 实际文件名取决于打包机器架构。当前配置生成 zip 包，不做签名和 notarization；首次打开时 macOS 可能提示来自未知开发者，需要在系统设置中允许打开。若要正式对外分发，建议后续补充 Apple Developer ID 签名和 notarization。

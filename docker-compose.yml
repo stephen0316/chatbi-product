@@ -1,22 +1,22 @@
 services:
-  chatbi:
+  product-huizhen:
     build:
       context: .
       dockerfile: Dockerfile
-    image: chatbi:latest
-    container_name: chatbi
+    image: product-huizhen:latest
+    container_name: product-huizhen
     restart: unless-stopped
     env_file:
       - .env
     environment:
       NODE_ENV: production
       PORT: 3000
-      PYTHON_BIN: /opt/chatbi-venv/bin/python
+      PYTHON_BIN: /opt/product-huizhen-venv/bin/python
       CHATBI_STORAGE_DIR: /app/storage
     ports:
       - "3001:3000"
     volumes:
-      - chatbi-storage:/app/storage
+      - product-huizhen-storage:/app/storage
 
 volumes:
-  chatbi-storage:
+  product-huizhen-storage:
