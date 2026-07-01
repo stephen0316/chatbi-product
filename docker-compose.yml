@@ -1,0 +1,22 @@
+services:
+  chatbi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chatbi:latest
+    container_name: chatbi
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      PYTHON_BIN: /opt/chatbi-venv/bin/python
+      CHATBI_STORAGE_DIR: /app/storage
+    ports:
+      - "3001:3000"
+    volumes:
+      - chatbi-storage:/app/storage
+
+volumes:
+  chatbi-storage:

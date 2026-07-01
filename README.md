@@ -7,6 +7,7 @@
 - [桌面部署方案](docs/desktop-deployment-plan.md)
 - [Windows 桌面版打包操作手册](docs/windows-electron-build-manual.md)
 - [macOS 桌面版打包操作手册](docs/macos-electron-build-manual.md)
+- [Docker 内网部署交付手册](docs/docker-deployment-guide.md)
 
 ## 启动
 
@@ -21,6 +22,30 @@ npm run dev
 ```text
 http://localhost:3000
 ```
+
+## Docker 内网部署
+
+服务器 Web 版推荐使用 Docker，避免内网服务器 Node/glibc/npm 版本不兼容。容器内会固定 Node、Python 和 openpyxl，运行时不会安装 Electron 打包依赖。
+
+```bash
+cp .env.docker.example .env
+docker build -t chatbi:latest .
+docker compose up -d
+```
+
+浏览器访问：
+
+```text
+http://服务器IP:3001
+```
+
+离线内网部署可先在可联网机器构建并导出镜像：
+
+```bash
+docker save chatbi:latest -o chatbi-latest.tar
+```
+
+详细步骤见 [Docker 内网部署交付手册](docs/docker-deployment-guide.md)。
 
 ## 模型问答配置
 
