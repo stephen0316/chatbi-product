@@ -49,11 +49,12 @@ vi .env
 至少确认：
 
 ```bash
-GEMINI_API_KEY=你的服务端Key
-GEMINI_MODEL=gemini-2.5-flash
+LLM_API_KEY=你的服务端Key
+LLM_BASE_URL=https://onerouter.cmaiot.cn/v1
+LLM_MODEL=qwen3.7-max
 ```
 
-如果内网不能访问 Gemini API，可以先保留空值。本地分析和导出仍可用，智能问答会受影响。
+如果内网不能访问模型网关，可以先保留空值。本地分析和导出仍可用，智能问答会受影响。
 
 ### 3.2 构建镜像
 
@@ -223,4 +224,4 @@ http://服务器IP:8080
 - Docker 版是 Web 服务部署，不是桌面应用。
 - 不要在服务器上执行普通 `npm install` 安装 Electron 打包依赖。
 - 如果需要重新构建镜像，只需要执行 `docker build`，不需要服务器本机安装 Node/Python。
-- 如果 Gemini API 在内网不可访问，本地分析和 Excel 导出仍可用，但智能问答会报模型接口错误。
+- 如果模型网关在内网不可访问，本地分析和 Excel 导出仍可用，但智能问答会报模型接口错误。

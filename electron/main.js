@@ -47,11 +47,14 @@ async function configureRuntimeEnvironment() {
   process.env.SESSION_RETENTION_DAYS = process.env.SESSION_RETENTION_DAYS || "3";
 
   const config = await readEmbeddedConfig();
-  if (!process.env.GEMINI_API_KEY && config.geminiApiKey) {
-    process.env.GEMINI_API_KEY = config.geminiApiKey;
+  if (!process.env.LLM_API_KEY && config.llmApiKey) {
+    process.env.LLM_API_KEY = config.llmApiKey;
   }
-  if (!process.env.GEMINI_MODEL && config.geminiModel) {
-    process.env.GEMINI_MODEL = config.geminiModel;
+  if (!process.env.LLM_BASE_URL && config.llmBaseUrl) {
+    process.env.LLM_BASE_URL = config.llmBaseUrl;
+  }
+  if (!process.env.LLM_MODEL && config.llmModel) {
+    process.env.LLM_MODEL = config.llmModel;
   }
 
   const analyzerScript = app.isPackaged

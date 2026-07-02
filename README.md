@@ -52,10 +52,12 @@ docker save product-huizhen:latest -o product-huizhen-latest.tar
 模型 key 只放在服务端 `.env`，不要写入前端代码：
 
 ```bash
-GEMINI_API_KEY=your_key_here
+LLM_API_KEY=your_key_here
+LLM_BASE_URL=https://onerouter.cmaiot.cn/v1
+LLM_MODEL=qwen3.7-max
 ```
 
-未配置 `GEMINI_API_KEY` 时，系统仍支持常见统计类本地问答，例如强制退市数量、规则命中数量等。
+接口需兼容 OpenAI Chat Completions：`POST /v1/chat/completions`。未配置 `LLM_API_KEY` 时，系统仍支持常见统计类本地问答，例如强制退市数量、规则命中数量等。
 
 ## Windows 桌面版打包
 
@@ -70,7 +72,7 @@ npm run package:python-win
 npm run build:win
 ```
 
-构建前需要在 `.env` 中写入 `GEMINI_API_KEY`。构建脚本会生成 `build/electron/embedded-config.json`，并将 key 作为 Electron 资源打入安装包，不会暴露到前端代码。注意：内置 key 无法做到绝对保密，安装包被逆向后仍存在泄露风险。
+构建前需要在 `.env` 中写入 `LLM_API_KEY`、`LLM_BASE_URL` 和 `LLM_MODEL`。构建脚本会生成 `build/electron/embedded-config.json`，并将 key 作为 Electron 资源打入安装包，不会暴露到前端代码。注意：内置 key 无法做到绝对保密，安装包被逆向后仍存在泄露风险。
 
 Windows 产物：
 
@@ -99,7 +101,7 @@ npm run package:analyzer-mac
 npm run build:mac
 ```
 
-构建前同样需要在 `.env` 中写入 `GEMINI_API_KEY`。
+构建前同样需要在 `.env` 中写入 `LLM_API_KEY`、`LLM_BASE_URL` 和 `LLM_MODEL`。
 
 macOS 产物：
 

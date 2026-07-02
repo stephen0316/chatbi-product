@@ -26,13 +26,14 @@ async function exists(targetPath) {
   }
 }
 
-const geminiApiKey = process.env.GEMINI_API_KEY || "";
-const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const allowEmptyKey = process.env.ALLOW_EMPTY_GEMINI_KEY === "1";
+const llmApiKey = process.env.LLM_API_KEY || "";
+const llmBaseUrl = process.env.LLM_BASE_URL || "https://onerouter.cmaiot.cn/v1";
+const llmModel = process.env.LLM_MODEL || "qwen3.7-max";
+const allowEmptyKey = process.env.ALLOW_EMPTY_LLM_KEY === "1";
 
-if (!geminiApiKey && !allowEmptyKey) {
+if (!llmApiKey && !allowEmptyKey) {
   throw new Error(
-    "缺少 GEMINI_API_KEY。请在 .env 或环境变量中设置后再运行打包命令；如需测试空 key，可设置 ALLOW_EMPTY_GEMINI_KEY=1。",
+    "缺少 LLM_API_KEY。请在 .env 或环境变量中设置后再运行打包命令；如需测试空 key，可设置 ALLOW_EMPTY_LLM_KEY=1。",
   );
 }
 
@@ -51,7 +52,7 @@ if (targetPlatform === "mac" && !(await exists(macAnalyzer))) {
 await fs.mkdir(outputDir, { recursive: true });
 await fs.writeFile(
   outputPath,
-  JSON.stringify({ geminiApiKey, geminiModel }, null, 2),
+  JSON.stringify({ llmApiKey, llmBaseUrl, llmModel }, null, 2),
   "utf8",
 );
 

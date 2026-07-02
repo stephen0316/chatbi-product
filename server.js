@@ -13,8 +13,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const LLM_API_KEY = process.env.LLM_API_KEY || "";
+const LLM_BASE_URL = (process.env.LLM_BASE_URL || "https://onerouter.cmaiot.cn/v1").replace(/\/+$/, "");
+const LLM_CHAT_COMPLETIONS_URL = process.env.LLM_CHAT_COMPLETIONS_URL || `${LLM_BASE_URL}/chat/completions`;
+const LLM_MODEL = process.env.LLM_MODEL || "qwen3.7-max";
 const DEFAULT_BUNDLED_PYTHON =
   "/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3";
 const PYTHON_BIN = process.env.PYTHON_BIN || DEFAULT_BUNDLED_PYTHON;
@@ -284,16 +286,26 @@ async function runAnalyzerFromInspection(paths) {
   );
 }
 
-async function callGemini(prompt) {
+function getModelErrorMessage(data, status) {
+  if (typeof data?.error === "string") return data.error;
+  if (data?.error?.message) return data.error.message;
+  if (data?.message) return data.message;
+  return `模型接口调用失败：HTTP ${status}`;
+}
+
+async function callChatModel(prompt) {
   const requestBody = JSON.stringify({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2 },
+    model: LLM_MODEL,
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.2,
   });
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
   try {
-    const response = await fetch(url, {
+    const response = await fetch(LLM_CHAT_COMPLETIONS_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${LLM_API_KEY}`,
+        "Content-Type": "application/json",
+      },
       body: requestBody,
     });
     const text = await response.text();
@@ -303,12 +315,8 @@ async function callGemini(prompt) {
     } catch {
       throw new Error(`模型接口返回非 JSON 内容：${text.slice(0, 120)}`);
     }
-    if (!response.ok) throw new Error(data?.error?.message || `模型接口调用失败：HTTP ${response.status}`);
-    if (data?.error) throw new Error(data.error.message || "模型接口调用失败");
-    return (
-      data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim() ||
-      "模型没有返回有效回答。"
-    );
+    if (!response.ok || data?.error) throw new Error(getModelErrorMessage(data, response.status));
+    return data?.choices?.[0]?.message?.content?.trim() || "模型没有返回有效回答。";
   } catch (error) {
     throw new Error(error.message || "模型接口调用失败");
   }
@@ -347,8 +355,8 @@ function columnsFromHeaders(sheet, type, aiColumns) {
   return columns;
 }
 
-async function refineInspectionWithGemini(inspection, paths) {
-  if (!inspection.needs_ai || !GEMINI_API_KEY) return inspection;
+async function refineInspectionWithModel(inspection) {
+  if (!inspection.needs_ai || !LLM_API_KEY) return inspection;
   const prompt = [
     "你是 Excel 上传文件识别助手。只根据文件名、sheet 名、表头名、行数和月份范围判断，不要臆造不存在字段。",
     "请返回严格 JSON，不要解释。结构：",
@@ -358,7 +366,7 @@ async function refineInspectionWithGemini(inspection, paths) {
   ].join("\n\n");
 
   try {
-    const ai = extractJsonObject(await callGemini(prompt, paths));
+    const ai = extractJsonObject(await callChatModel(prompt));
     const selected = ai.selected || {};
     const productSheets = [];
     for (const item of selected.product_sheets || []) {
@@ -400,7 +408,7 @@ async function refineInspectionWithGemini(inspection, paths) {
     }
     inspection.warnings = [...(inspection.warnings || []), ...(ai.warnings || [])].filter(Boolean);
   } catch (error) {
-    inspection.warnings = [...(inspection.warnings || []), `Gemini 辅助识别失败：${error.message}`];
+    inspection.warnings = [...(inspection.warnings || []), `模型辅助识别失败：${error.message}`];
   }
   return inspection;
 }
@@ -488,7 +496,7 @@ app.post("/api/inspect-upload", upload.array("analysisFiles", 12), async (req, r
       ...file,
       name: displayUploadName(file.name),
     }));
-    inspection = await refineInspectionWithGemini(inspection, paths);
+    inspection = await refineInspectionWithModel(inspection);
     await fs.writeFile(paths.inspectionJson, JSON.stringify(inspection, null, 2), "utf8");
     res.json({ ok: true, inspection: stripInspectionPaths(inspection) });
   } catch (error) {
@@ -632,11 +640,11 @@ app.post("/api/chat", async (req, res) => {
       throw new Error("当前会话还没有可用的分析结果，请先上传并分析。");
     }
     const localAnswer = answerLocally(question, payload);
-    if (localAnswer && !GEMINI_API_KEY) {
+    if (localAnswer && !LLM_API_KEY) {
       return res.json({ ok: true, answer: localAnswer, provider: "local" });
     }
-    if (!GEMINI_API_KEY) {
-      throw new Error("服务端未配置 GEMINI_API_KEY，无法调用模型问答");
+    if (!LLM_API_KEY) {
+      throw new Error("服务端未配置 LLM_API_KEY，无法调用模型问答");
     }
 
     const prompt = [
@@ -645,8 +653,8 @@ app.post("/api/chat", async (req, res) => {
       `上下文：\n${createAiContext(payload)}`,
       `用户问题：${question}`,
     ].join("\n\n");
-    const answer = await callGemini(prompt, req.sessionPaths);
-    res.json({ ok: true, answer, provider: GEMINI_MODEL });
+    const answer = await callChatModel(prompt);
+    res.json({ ok: true, answer, provider: LLM_MODEL });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
   }
@@ -667,7 +675,7 @@ export async function startServer(options = {}) {
       const actualPort = typeof address === "object" && address ? address.port : port;
       const actualHost = host || "localhost";
       console.log(`Product delisting app listening on http://${actualHost}:${actualPort}`);
-      console.log(GEMINI_API_KEY ? "Gemini Q&A enabled." : "Gemini Q&A disabled: set GEMINI_API_KEY in .env.");
+      console.log(LLM_API_KEY ? `Model Q&A enabled: ${LLM_MODEL}.` : "Model Q&A disabled: set LLM_API_KEY in .env.");
       resolve({ app, server, port: actualPort, host: actualHost });
     });
     server.once("error", reject);
