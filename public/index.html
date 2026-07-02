@@ -14,7 +14,7 @@
           <div class="upload-header">
             <div class="brand-block">
               <h1>产品慧诊</h1>
-              <p>上传全量产品清单与收入明细，自动识别清退候选并生成建议表。</p>
+              <p>上传产品清单与收入明细表，自动匹配退市规则并生成建议表</p>
             </div>
             <button class="primary upload-open" id="openUpload" type="button">
               <svg class="button-icon" viewBox="0 0 1024 1024" aria-hidden="true" focusable="false">
@@ -124,9 +124,26 @@
               <button class="icon-button" id="closeChat" type="button" aria-label="关闭智能问答">×</button>
             </div>
             <div class="chat-log" id="chatLog">
-              <div class="assistant-msg chat-hint">上传并分析后，可以询问“强制退市有多少条”“规则2命中了哪些口径”等问题。</div>
+              <div class="chat-empty chat-hint">
+                <img class="chat-empty-mascot" src="/assets/chat-assistant-mascot-v2.png" alt="" />
+                <div class="chat-empty-copy">
+                  <h3>产品慧诊助手</h3>
+                  <p>上传分析后，我可以帮你快速复盘结果。</p>
+                </div>
+                <div class="chat-suggestions" aria-label="推荐问题">
+                  <button class="chat-suggestion" type="button" data-question="根据分析结果能得出什么结论？">根据分析结果能得出什么结论？</button>
+                  <button class="chat-suggestion" type="button" data-question="对团队后续工作有什么建议？">对团队后续工作有什么建议？</button>
+                  <button class="chat-suggestion" type="button" data-question="哪些部门应退未退的产品最多？">哪些部门应退未退的产品最多？</button>
+                </div>
+              </div>
             </div>
             <form class="chat-box" id="chatForm">
+              <button class="new-chat-button" id="newChat" type="button" aria-label="新建会话" data-tooltip="新建会话">
+                <svg class="icon" viewBox="0 0 1024 1024" aria-hidden="true" focusable="false">
+                  <path d="M548 352v124h124c0 39.765-32.235 72-72 72h-52v52c0 39.765-32.235 72-72 72v-124H352c0-39.765 32.2355-72 72-72h52V424c0-39.7645 32.235-72 72-72z" fill="#515151" fill-opacity=".65"></path>
+                  <path d="M632 112c154.64 0 280 125.3605 280 280v448c0 39.765-32.235 72-72 72H392c-154.6395 0-280-125.36-280-280V392c0-154.6395 125.3605-280 280-280h240z m0 72H392c-114.875 0-208 93.125-208 208v240c0 114.875 93.125 208 208 208h448V392c0-114.875-93.125-208-208-208z" fill="#515151" fill-opacity=".65"></path>
+                </svg>
+              </button>
               <input id="questionInput" type="text" placeholder="有问题，询问我" />
               <button class="send-button" type="submit" aria-label="提问">
                 <svg class="icon" viewBox="0 0 1024 1024" aria-hidden="true">

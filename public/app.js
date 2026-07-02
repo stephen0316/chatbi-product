@@ -21,6 +21,7 @@ const searchInput = document.querySelector("#searchInput");
 const chatForm = document.querySelector("#chatForm");
 const questionInput = document.querySelector("#questionInput");
 const chatLog = document.querySelector("#chatLog");
+const newChat = document.querySelector("#newChat");
 const analysisArea = document.querySelector("#analysisArea");
 const chatDrawer = document.querySelector("#chatDrawer");
 const openChat = document.querySelector("#openChat");
@@ -49,6 +50,11 @@ let loadingCodeTimer = null;
 let loadingCodeRunId = 0;
 
 const analysisFilesHint = "支持 .xlsx、.xls、.xlsm，最多 12 个文件，单个不超过 100MB；系统会自动识别产品列表和收入成本明细表";
+const chatSuggestionQuestions = [
+  "根据分析结果能得出什么结论？",
+  "对团队后续工作有什么建议？",
+  "哪些部门应退未退的产品最多？",
+];
 const PUBLIC_FIELD_LABELS = {
   code: "产品编码",
   name: "产品名称",
@@ -743,25 +749,81 @@ function clearChatHint() {
   chatLog.querySelector(".chat-hint")?.remove();
 }
 
-chatForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const question = questionInput.value.trim();
+function createChatEmptyState() {
+  const state = document.createElement("div");
+  state.className = "chat-empty chat-hint";
+
+  const mascot = document.createElement("img");
+  mascot.className = "chat-empty-mascot";
+  mascot.src = "/assets/chat-assistant-mascot-v2.png";
+  mascot.alt = "";
+
+  const copy = document.createElement("div");
+  copy.className = "chat-empty-copy";
+  const title = document.createElement("h3");
+  title.textContent = "产品慧诊助手";
+  const description = document.createElement("p");
+  description.textContent = "上传分析后，我可以帮你快速复盘结果。";
+  copy.append(title, description);
+
+  const suggestions = document.createElement("div");
+  suggestions.className = "chat-suggestions";
+  suggestions.setAttribute("aria-label", "推荐问题");
+  chatSuggestionQuestions.forEach((question) => {
+    const button = document.createElement("button");
+    button.className = "chat-suggestion";
+    button.type = "button";
+    button.dataset.question = question;
+    button.textContent = question;
+    suggestions.appendChild(button);
+  });
+
+  state.append(mascot, copy, suggestions);
+  return state;
+}
+
+function resetChatWindow() {
+  chatLog.replaceChildren(createChatEmptyState());
+  questionInput.value = "";
+  chatLog.scrollTop = 0;
+  questionInput.focus();
+}
+
+newChat.addEventListener("click", resetChatWindow);
+
+async function submitQuestion(question) {
   if (!question) return;
   clearChatHint();
   addMessage("user-msg", question);
   questionInput.value = "";
   const pending = addMessage("assistant-msg", "正在分析...");
-  const response = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
-  });
-  const data = await response.json();
-  if (response.ok) {
-    renderMarkdown(pending, data.answer);
-  } else {
-    pending.textContent = data.error || "问答失败。";
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      renderMarkdown(pending, data.answer);
+    } else {
+      pending.textContent = data.error || "问答失败。";
+    }
+  } catch {
+    pending.textContent = "问答服务连接失败，请确认本地服务正在运行后重试。";
   }
+}
+
+chatLog.addEventListener("click", (event) => {
+  const suggestion = event.target.closest(".chat-suggestion");
+  if (!suggestion) return;
+  submitQuestion(suggestion.dataset.question || suggestion.textContent.trim());
+});
+
+chatForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const question = questionInput.value.trim();
+  await submitQuestion(question);
 });
 
 loadStatus().catch((error) => {

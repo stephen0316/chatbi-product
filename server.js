@@ -31,6 +31,10 @@ const SESSION_RETENTION_MS = SESSION_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const TMP_RETENTION_MINUTES = Number(process.env.TMP_RETENTION_MINUTES || 30);
 const TMP_RETENTION_MS = TMP_RETENTION_MINUTES * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const configuredLocalAnswerDelayMs = Number(process.env.LOCAL_ANSWER_DELAY_MS ?? 900);
+const LOCAL_ANSWER_DELAY_MS = Number.isFinite(configuredLocalAnswerDelayMs)
+  ? Math.max(0, configuredLocalAnswerDelayMs)
+  : 900;
 const ANALYZER_SCRIPT =
   process.env.CHATBI_ANALYZER_SCRIPT || path.join(__dirname, "scripts", "analyze_delisting.py");
 const ANALYZER_CWD = path.dirname(ANALYZER_BIN || ANALYZER_SCRIPT);
@@ -54,6 +58,12 @@ const upload = multer({
 function normalize(value) {
   if (value == null || typeof value === "boolean") return "";
   return String(value).trim();
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function decodeUploadName(name) {
@@ -318,6 +328,9 @@ async function callChatModel(prompt) {
     if (!response.ok || data?.error) throw new Error(getModelErrorMessage(data, response.status));
     return data?.choices?.[0]?.message?.content?.trim() || "模型没有返回有效回答。";
   } catch (error) {
+    if (error.message === "fetch failed") {
+      throw new Error(`模型服务连接失败：无法访问 ${LLM_BASE_URL}，请检查网络、代理或模型网关配置。`);
+    }
     throw new Error(error.message || "模型接口调用失败");
   }
 }
@@ -438,25 +451,74 @@ function createAiContext(payload) {
   );
 }
 
-function answerLocally(question, payload) {
+function answerLocally(question, payload, options = {}) {
+  const includeNarrative = Boolean(options.includeNarrative);
   const q = question.trim();
+  const metadata = payload.metadata || {};
+  const rows = payload.rows || [];
+  const missingRows = payload.missing_rule4_approval_rows || [];
+  const delistingCounts = metadata.delisting_type_counts || {};
+  const ruleCounts = metadata.rule_counts || {};
+  const statusCounts = metadata.candidate_status_counts || {};
+
+  const countBy = (items, key) => {
+    const counts = new Map();
+    for (const item of items) {
+      const value = normalize(item[key]) || "未填写";
+      counts.set(value, (counts.get(value) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  };
+
+  const formatTopCounts = (counts, limit = 5) => {
+    if (!counts.length) return "暂无可统计数据";
+    return counts.slice(0, limit).map(([name, count], index) => `${index + 1}. ${name}：${count} 个`).join("\n");
+  };
+
+  if (includeNarrative && /结论|总结|分析结果|得出什么/.test(q)) {
+    const topRule = Object.entries(ruleCounts).sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))[0];
+    const topDepartments = countBy(rows, "部门").slice(0, 3).map(([name, count]) => `${name} ${count} 个`).join("，") || "暂无";
+    return [
+      `本次分析共识别出 ${metadata.candidate_count || 0} 个退市候选产品。`,
+      `其中强制退市 ${delistingCounts["强制退市"] || 0} 个，建议退市 ${delistingCounts["建议退市"] || 0} 个；规则命中最多的是规则${topRule?.[0] || "-"}（${topRule?.[1] || 0} 个）。`,
+      `部门分布靠前的是：${topDepartments}。`,
+      `另有 ${metadata.missing_rule4_approval_count || 0} 个退市中产品因缺少退市审批完成时间，暂时无法判断规则4。`,
+    ].join("\n");
+  }
+
+  if (includeNarrative && /后续工作|团队|工作建议|怎么推进/.test(q)) {
+    return [
+      "建议按优先级推进：",
+      `1. 先处理强制退市产品 ${delistingCounts["强制退市"] || 0} 个，优先核对规则1和规则2命中的产品口径。`,
+      `2. 对建议退市产品 ${delistingCounts["建议退市"] || 0} 个做业务复核，重点确认近两年收入和毛利是否完整。`,
+      `3. 补齐 ${metadata.missing_rule4_approval_count || 0} 个退市中产品的退市审批完成时间，避免规则4长期无法判断。`,
+      "4. 将候选数量靠前的部门作为第一批沟通对象，逐项确认保留、退市或补数原因。",
+    ].join("\n");
+  }
+
+  if (/部门/.test(q) && /最多|排行|排名|分布|应退未退/.test(q)) {
+    const departmentCounts = countBy(rows, "部门");
+    return `按当前退市候选结果统计，产品数量最多的部门如下：\n${formatTopCounts(departmentCounts)}`;
+  }
+
   if (/强制/.test(q)) {
-    return `强制退市 ${payload.metadata.delisting_type_counts["强制退市"] || 0} 条。`;
+    return `强制退市 ${delistingCounts["强制退市"] || 0} 条。`;
   }
-  if (/建议/.test(q)) {
-    return `建议退市 ${payload.metadata.delisting_type_counts["建议退市"] || 0} 条。`;
+  if (/建议退市|建议类|建议产品/.test(q)) {
+    return `建议退市 ${delistingCounts["建议退市"] || 0} 条。`;
   }
-  if (/规则\s*1|规则一/.test(q)) return `规则1命中 ${payload.metadata.rule_counts["1"] || 0} 条。`;
-  if (/规则\s*2|规则二/.test(q)) return `规则2命中 ${payload.metadata.rule_counts["2"] || 0} 条。`;
-  if (/规则\s*3|规则三/.test(q)) return `规则3命中 ${payload.metadata.rule_counts["3"] || 0} 条。`;
+  if (/规则\s*1|规则一/.test(q)) return `规则1命中 ${ruleCounts["1"] || 0} 条。`;
+  if (/规则\s*2|规则二/.test(q)) return `规则2命中 ${ruleCounts["2"] || 0} 条。`;
+  if (/规则\s*3|规则三/.test(q)) return `规则3命中 ${ruleCounts["3"] || 0} 条。`;
   if (/无法判断|缺少|缺失|没有/.test(q) && /审批|退市审批|完成时间|规则\s*4|规则四/.test(q)) {
-    return `无法判断规则4的产品 ${payload.metadata.missing_rule4_approval_count || 0} 条；这些产品状态为退市中，因缺少退市审批完成时间，无法判断是否退市中超过1年。`;
+    const topDepartments = countBy(missingRows, "部门").slice(0, 3).map(([name, count]) => `${name} ${count} 个`).join("，");
+    return `无法判断规则4的产品 ${metadata.missing_rule4_approval_count || 0} 条；这些产品状态为退市中，因缺少退市审批完成时间，无法判断是否退市中超过1年。${topDepartments ? `部门分布靠前的是：${topDepartments}。` : ""}`;
   }
   if (/规则\s*4|规则四|退市中/.test(q)) {
-    return `规则4命中 ${payload.metadata.rule_counts["4"] || 0} 条；另有 ${payload.metadata.missing_rule4_approval_count || 0} 条产品因缺少退市审批完成时间而无法判断规则4。`;
+    return `规则4命中 ${ruleCounts["4"] || 0} 条；另有 ${metadata.missing_rule4_approval_count || 0} 条产品因缺少退市审批完成时间而无法判断规则4。`;
   }
   if (/已入库/.test(q)) {
-    return `候选结果中“已入库”状态 ${payload.metadata.candidate_status_counts["已入库"] || 0} 条。`;
+    return `候选结果中“已入库”状态 ${statusCounts["已入库"] || 0} 条。`;
   }
   return "";
 }
@@ -639,8 +701,11 @@ app.post("/api/chat", async (req, res) => {
     } catch {
       throw new Error("当前会话还没有可用的分析结果，请先上传并分析。");
     }
-    const localAnswer = answerLocally(question, payload);
-    if (localAnswer && !LLM_API_KEY) {
+    const localAnswer = answerLocally(question, payload, { includeNarrative: !LLM_API_KEY });
+    if (localAnswer) {
+      if (LOCAL_ANSWER_DELAY_MS > 0) {
+        await sleep(LOCAL_ANSWER_DELAY_MS);
+      }
       return res.json({ ok: true, answer: localAnswer, provider: "local" });
     }
     if (!LLM_API_KEY) {
