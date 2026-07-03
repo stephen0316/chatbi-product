@@ -20,7 +20,7 @@ npm run dev
 浏览器打开：
 
 ```text
-http://localhost:3000
+http://localhost:4000
 ```
 
 ## Docker 内网部署
@@ -36,7 +36,7 @@ docker compose up -d
 浏览器访问：
 
 ```text
-http://服务器IP:3001
+http://服务器IP:4000
 ```
 
 离线内网部署可先在可联网机器构建并导出镜像：

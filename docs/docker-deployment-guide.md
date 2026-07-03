@@ -80,7 +80,7 @@ docker compose up -d
 访问地址：
 
 ```text
-http://服务器IP:3001
+http://服务器IP:4000
 ```
 
 ### 3.4 查看状态
@@ -88,7 +88,7 @@ http://服务器IP:3001
 ```bash
 docker compose ps
 docker compose logs -f product-huizhen
-curl http://127.0.0.1:3001/api/status
+curl http://127.0.0.1:4000/api/status
 ```
 
 正常情况下 `/api/status` 会返回 JSON。
@@ -122,7 +122,7 @@ docker compose up -d
 访问：
 
 ```text
-http://服务器IP:3001
+http://服务器IP:4000
 ```
 
 ## 5. 数据目录和清理
@@ -198,19 +198,19 @@ docker compose up -d --force-recreate
 
 ```yaml
 ports:
-  - "3001:3000"
+  - "4000:4000"
 ```
 
 含义：
 
-- 服务器访问端口：`3001`
-- 容器内部端口：`3000`
+- 服务器访问端口：`4000`
+- 容器内部端口：`4000`
 
 如果公司要求使用 8080，可改为：
 
 ```yaml
 ports:
-  - "8080:3000"
+  - "8080:4000"
 ```
 
 然后访问：

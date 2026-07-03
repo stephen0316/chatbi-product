@@ -10,11 +10,11 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      PORT: 3000
+      PORT: 4000
       PYTHON_BIN: /opt/product-huizhen-venv/bin/python
       CHATBI_STORAGE_DIR: /app/storage
     ports:
-      - "3001:3000"
+      - "4000:4000"
     volumes:
       - product-huizhen-storage:/app/storage
 

@@ -1472,9 +1472,9 @@ tr:nth-child(even) td {
 }
 
 .chat-box {
-  grid-template-columns: 36px minmax(0, 1fr) 44px;
+  grid-template-columns: 36px minmax(0, 1fr) 40px;
   align-items: center;
-  gap: 0px;
+  gap: 0;
   border-top: 1px solid var(--line);
   padding: 12px;
   background: #ffffff;
@@ -1499,6 +1499,8 @@ tr:nth-child(even) td {
 .new-chat-button,
 .send-button {
   display: inline-grid;
+  align-self: center;
+  justify-self: center;
   place-items: center;
   width: 32px;
   height: 32px;
