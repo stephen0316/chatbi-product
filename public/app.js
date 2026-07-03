@@ -17,6 +17,7 @@ const missingApprovalCount = document.querySelector("#missingApprovalCount");
 const missingApprovalAction = document.querySelector("#missingApprovalAction");
 const resultBody = document.querySelector("#resultBody");
 const summaryGrid = document.querySelector("#summaryGrid");
+const tableWrap = document.querySelector(".table-wrap");
 const searchInput = document.querySelector("#searchInput");
 const chatForm = document.querySelector("#chatForm");
 const questionInput = document.querySelector("#questionInput");
@@ -48,12 +49,28 @@ let selectedAnalysisFiles = [];
 let uploadStep = 1;
 let loadingCodeTimer = null;
 let loadingCodeRunId = 0;
+const activeChatLoaders = new Set();
+let tableScrollbarXHideTimer = null;
+let tableScrollbarYHideTimer = null;
+let tableScrollbarX = null;
+let tableScrollbarY = null;
+let tableScrollbarXThumb = null;
+let tableScrollbarYThumb = null;
+let lastTableScrollLeft = 0;
+let lastTableScrollTop = 0;
 
 const analysisFilesHint = "支持 .xlsx、.xls、.xlsm，最多 12 个文件，单个不超过 100MB；系统会自动识别产品列表和收入成本明细表";
 const chatSuggestionQuestions = [
   "根据分析结果能得出什么结论？",
   "对团队后续工作有什么建议？",
   "哪些部门应退未退的产品最多？",
+];
+const chatLoadingSteps = [
+  "读取当前上传文件和分析结果上下文",
+  "梳理命中规则、退市类型和产品状态",
+  "核对部门分布、收入、毛利等关键字段",
+  "整理可复盘的结论和行动建议",
+  "生成回答中",
 ];
 const PUBLIC_FIELD_LABELS = {
   code: "产品编码",
@@ -558,6 +575,7 @@ function renderRows() {
   if (!rows.length) {
     const text = showingMissingApproval ? "没有无法判断的产品" : "没有匹配的结果";
     resultBody.innerHTML = `<tr><td colspan="9" class="empty">${text}</td></tr>`;
+    window.requestAnimationFrame(updateTableScrollbars);
     return;
   }
 
@@ -580,6 +598,105 @@ function renderRows() {
       `;
     })
     .join("");
+  window.requestAnimationFrame(updateTableScrollbars);
+}
+
+function setupTableScrollbars() {
+  if (!tableWrap) return;
+
+  tableScrollbarY = document.createElement("div");
+  tableScrollbarY.className = "table-scrollbar-indicator table-scrollbar-y";
+  tableScrollbarY.setAttribute("aria-hidden", "true");
+
+  const yTrack = document.createElement("div");
+  yTrack.className = "table-scrollbar-track";
+
+  tableScrollbarYThumb = document.createElement("div");
+  tableScrollbarYThumb.className = "table-scrollbar-thumb";
+
+  tableScrollbarX = document.createElement("div");
+  tableScrollbarX.className = "table-scrollbar-indicator table-scrollbar-x";
+  tableScrollbarX.setAttribute("aria-hidden", "true");
+
+  const xTrack = document.createElement("div");
+  xTrack.className = "table-scrollbar-track";
+
+  tableScrollbarXThumb = document.createElement("div");
+  tableScrollbarXThumb.className = "table-scrollbar-thumb";
+
+  yTrack.appendChild(tableScrollbarYThumb);
+  tableScrollbarY.appendChild(yTrack);
+  xTrack.appendChild(tableScrollbarXThumb);
+  tableScrollbarX.appendChild(xTrack);
+  tableWrap.prepend(tableScrollbarY, tableScrollbarX);
+
+  lastTableScrollLeft = tableWrap.scrollLeft;
+  lastTableScrollTop = tableWrap.scrollTop;
+  tableWrap.addEventListener("scroll", handleTableScroll);
+  window.addEventListener("resize", () => window.requestAnimationFrame(updateTableScrollbars));
+  window.requestAnimationFrame(updateTableScrollbars);
+}
+
+function updateTableScrollbars() {
+  if (!tableWrap || !tableScrollbarX || !tableScrollbarY || !tableScrollbarXThumb || !tableScrollbarYThumb) return;
+
+  const maxScrollLeft = tableWrap.scrollWidth - tableWrap.clientWidth;
+  const maxScrollTop = tableWrap.scrollHeight - tableWrap.clientHeight;
+
+  if (maxScrollLeft > 1) {
+    tableWrap.classList.add("has-horizontal-scroll");
+
+    const xTrackWidth = Math.max(tableWrap.clientWidth - 14, 80);
+    const xThumbWidth = Math.max(64, Math.round((tableWrap.clientWidth / tableWrap.scrollWidth) * xTrackWidth));
+    const maxThumbLeft = Math.max(xTrackWidth - xThumbWidth, 0);
+    const thumbLeft = Math.round((tableWrap.scrollLeft / maxScrollLeft) * maxThumbLeft);
+
+    tableScrollbarX.style.width = `${xTrackWidth}px`;
+    tableScrollbarXThumb.style.width = `${Math.min(xThumbWidth, xTrackWidth)}px`;
+    tableScrollbarXThumb.style.transform = `translateX(${thumbLeft}px)`;
+  } else {
+    tableWrap.classList.remove("has-horizontal-scroll", "is-scrolling-x");
+  }
+
+  if (maxScrollTop > 1) {
+    tableWrap.classList.add("has-vertical-scroll");
+
+    const yTrackHeight = Math.max(tableWrap.clientHeight - 14, 80);
+    const yThumbHeight = Math.max(36, Math.round((tableWrap.clientHeight / tableWrap.scrollHeight) * yTrackHeight));
+    const maxThumbTop = Math.max(yTrackHeight - yThumbHeight, 0);
+    const thumbTop = Math.round((tableWrap.scrollTop / maxScrollTop) * maxThumbTop);
+
+    tableScrollbarY.style.setProperty("--table-scrollbar-y-height", `${yTrackHeight}px`);
+    tableScrollbarYThumb.style.height = `${Math.min(yThumbHeight, yTrackHeight)}px`;
+    tableScrollbarYThumb.style.transform = `translateY(${thumbTop}px)`;
+  } else {
+    tableWrap.classList.remove("has-vertical-scroll", "is-scrolling-y");
+  }
+}
+
+function handleTableScroll() {
+  const deltaX = Math.abs(tableWrap.scrollLeft - lastTableScrollLeft);
+  const deltaY = Math.abs(tableWrap.scrollTop - lastTableScrollTop);
+  lastTableScrollLeft = tableWrap.scrollLeft;
+  lastTableScrollTop = tableWrap.scrollTop;
+
+  updateTableScrollbars();
+
+  if (deltaX > deltaY && tableWrap.classList.contains("has-horizontal-scroll")) {
+    tableWrap.classList.add("is-scrolling-x");
+    window.clearTimeout(tableScrollbarXHideTimer);
+    tableScrollbarXHideTimer = window.setTimeout(() => {
+      tableWrap.classList.remove("is-scrolling-x");
+    }, 900);
+  }
+
+  if (deltaY >= deltaX && tableWrap.classList.contains("has-vertical-scroll")) {
+    tableWrap.classList.add("is-scrolling-y");
+    window.clearTimeout(tableScrollbarYHideTimer);
+    tableScrollbarYHideTimer = window.setTimeout(() => {
+      tableWrap.classList.remove("is-scrolling-y");
+    }, 900);
+  }
 }
 
 function formatReason(reason) {
@@ -745,6 +862,59 @@ function addMessage(className, text, options = {}) {
   return node;
 }
 
+function addChatLoadingMessage() {
+  const node = document.createElement("div");
+  node.className = "assistant-msg chat-loading-message";
+  node.setAttribute("role", "status");
+  node.setAttribute("aria-live", "polite");
+
+  const header = document.createElement("div");
+  header.className = "chat-loading-header";
+
+  const title = document.createElement("strong");
+  title.textContent = "正在分析";
+
+  const dots = document.createElement("span");
+  dots.className = "chat-loading-dots";
+  dots.setAttribute("aria-hidden", "true");
+  dots.innerHTML = "<span></span><span></span><span></span>";
+
+  header.append(title, dots);
+
+  const step = document.createElement("div");
+  step.className = "chat-loading-step";
+  step.textContent = chatLoadingSteps[0];
+
+  const progress = document.createElement("div");
+  progress.className = "chat-loading-progress";
+  progress.setAttribute("aria-hidden", "true");
+
+  node.append(header, step, progress);
+  chatLog.appendChild(node);
+  chatLog.scrollTop = chatLog.scrollHeight;
+
+  let stepIndex = 0;
+  const timer = window.setInterval(() => {
+    stepIndex = (stepIndex + 1) % chatLoadingSteps.length;
+    step.textContent = chatLoadingSteps[stepIndex];
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }, 1400);
+
+  const loader = {
+    node,
+    stop() {
+      if (!activeChatLoaders.has(loader)) return;
+      window.clearInterval(timer);
+      node.removeAttribute("role");
+      node.removeAttribute("aria-live");
+      node.classList.remove("chat-loading-message");
+      activeChatLoaders.delete(loader);
+    },
+  };
+  activeChatLoaders.add(loader);
+  return loader;
+}
+
 function clearChatHint() {
   chatLog.querySelector(".chat-hint")?.remove();
 }
@@ -783,6 +953,7 @@ function createChatEmptyState() {
 }
 
 function resetChatWindow() {
+  activeChatLoaders.forEach((loader) => loader.stop());
   chatLog.replaceChildren(createChatEmptyState());
   questionInput.value = "";
   chatLog.scrollTop = 0;
@@ -790,13 +961,14 @@ function resetChatWindow() {
 }
 
 newChat.addEventListener("click", resetChatWindow);
+setupTableScrollbars();
 
 async function submitQuestion(question) {
   if (!question) return;
   clearChatHint();
   addMessage("user-msg", question);
   questionInput.value = "";
-  const pending = addMessage("assistant-msg", "正在分析...");
+  const pending = addChatLoadingMessage();
   try {
     const response = await fetch("/api/chat", {
       method: "POST",
@@ -804,13 +976,15 @@ async function submitQuestion(question) {
       body: JSON.stringify({ question }),
     });
     const data = await response.json();
+    pending.stop();
     if (response.ok) {
-      renderMarkdown(pending, data.answer);
+      renderMarkdown(pending.node, data.answer);
     } else {
-      pending.textContent = data.error || "问答失败。";
+      pending.node.textContent = data.error || "问答失败。";
     }
   } catch {
-    pending.textContent = "问答服务连接失败，请确认本地服务正在运行后重试。";
+    pending.stop();
+    pending.node.textContent = "问答服务连接失败，请确认本地服务正在运行后重试。";
   }
 }
 
