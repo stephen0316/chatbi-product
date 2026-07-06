@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
+import sys
+import tempfile
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -15,6 +20,7 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 
 TARGET_REVENUE_SHEET = "收入及直接成本明细表"
 PRODUCT_LIST_SHEETS = ("自研类", "引入类")
+MAX_INSPECT_WORKERS = 4
 ACTIVE_STATUSES_FOR_RULES_1_TO_3 = {"已上市", "已入库"}
 REVENUE_START_MONTH = "2024-06"
 REVENUE_END_MONTH = "2026-05"
@@ -365,14 +371,14 @@ def read_product_list(product_list_path: Path) -> tuple[dict[str, dict[str, Any]
     }
 
 
-def inspect_workbooks(paths: list[Path]) -> dict[str, Any]:
-    files: list[dict[str, Any]] = []
+def inspect_single_workbook(task: tuple[int, Path]) -> dict[str, Any]:
+    file_index, workbook_path = task
+    file_id = f"file_{file_index + 1}"
+    workbook = None
     product_candidates: list[dict[str, Any]] = []
     revenue_candidates: list[dict[str, Any]] = []
-    warnings: list[str] = []
 
-    for file_index, workbook_path in enumerate(paths):
-        file_id = f"file_{file_index + 1}"
+    try:
         workbook = load_workbook(workbook_path, read_only=True, data_only=True)
         if any(sheet.max_row > 1 and sheet.max_column <= 1 for sheet in workbook.worksheets):
             workbook.close()
@@ -460,8 +466,8 @@ def inspect_workbooks(paths: list[Path]) -> dict[str, Any]:
             role = "revenue_detail"
             confidence = 0.86
             reason = "识别到产品编码、收入、毛利、月份等经营字段"
-        files.append(
-            {
+        return {
+            "file": {
                 "id": file_id,
                 "name": workbook_path.name,
                 "path": str(workbook_path),
@@ -469,8 +475,66 @@ def inspect_workbooks(paths: list[Path]) -> dict[str, Any]:
                 "confidence": confidence,
                 "reason": reason,
                 "sheets": sheets,
-            }
-        )
+            },
+            "product_candidates": product_candidates,
+            "revenue_candidates": revenue_candidates,
+        }
+    finally:
+        if workbook is not None:
+            workbook.close()
+
+
+def get_inspect_worker_count(file_count: int) -> int:
+    try:
+        configured = int(os.environ.get("CHATBI_INSPECT_MAX_WORKERS", MAX_INSPECT_WORKERS))
+    except ValueError:
+        configured = MAX_INSPECT_WORKERS
+    return max(1, min(MAX_INSPECT_WORKERS, configured, file_count))
+
+
+def analyzer_command() -> list[str]:
+    if getattr(sys, "frozen", False):
+        return [sys.executable]
+    return [sys.executable, str(Path(__file__).resolve())]
+
+
+def inspect_single_workbook_subprocess(task: tuple[int, Path]) -> dict[str, Any]:
+    file_index, workbook_path = task
+    with tempfile.TemporaryDirectory(prefix="chatbi-inspect-") as temp_dir:
+        output_json = Path(temp_dir) / "inspection-part.json"
+        command = [
+            *analyzer_command(),
+            "--inspect-single-file-index",
+            str(file_index),
+            "--inspect-single-file",
+            str(workbook_path),
+            "--output-json",
+            str(output_json),
+        ]
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip() or "未知错误"
+            raise RuntimeError(f"{workbook_path.name} 预检失败：{detail}")
+        return json.loads(output_json.read_text(encoding="utf-8"))
+
+
+def inspect_workbooks(paths: list[Path]) -> dict[str, Any]:
+    warnings: list[str] = []
+    tasks = list(enumerate(paths))
+    if len(tasks) <= 1:
+        inspection_parts = [inspect_single_workbook(task) for task in tasks]
+    else:
+        worker_count = get_inspect_worker_count(len(tasks))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            inspection_parts = list(executor.map(inspect_single_workbook_subprocess, tasks))
+
+    files = [part["file"] for part in inspection_parts]
+    product_candidates = [
+        candidate for part in inspection_parts for candidate in part["product_candidates"]
+    ]
+    revenue_candidates = [
+        candidate for part in inspection_parts for candidate in part["revenue_candidates"]
+    ]
 
     product_file_ids = [candidate["file_id"] for candidate in product_candidates]
     selected_product_file_id = product_file_ids[0] if product_file_ids else ""
@@ -965,6 +1029,8 @@ def write_output_workbook(payload: dict[str, Any], output_path: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--inspect-files", nargs="+")
+    parser.add_argument("--inspect-single-file")
+    parser.add_argument("--inspect-single-file-index", type=int, default=0)
     parser.add_argument("--mapping-json")
     parser.add_argument("--product-list")
     parser.add_argument("--revenue-files", nargs="+")
@@ -974,6 +1040,12 @@ def main() -> None:
 
     output_json = Path(args.output_json)
     output_json.parent.mkdir(parents=True, exist_ok=True)
+
+    if args.inspect_single_file:
+        inspection_part = inspect_single_workbook((args.inspect_single_file_index, Path(args.inspect_single_file)))
+        output_json.write_text(json.dumps(inspection_part, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(json.dumps({"ok": True, "mode": "inspect-single", "file": inspection_part["file"]["name"]}, ensure_ascii=False))
+        return
 
     if args.inspect_files:
         inspection = inspect_workbooks([Path(item) for item in args.inspect_files])
