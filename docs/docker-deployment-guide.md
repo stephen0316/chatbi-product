@@ -50,8 +50,8 @@ vi .env
 
 ```bash
 LLM_API_KEY=你的服务端Key
-LLM_BASE_URL=https://onerouter.cmaiot.cn/v1
-LLM_MODEL=qwen3.7-max
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-v4-pro
 ```
 
 如果内网不能访问模型网关，可以先保留空值。本地分析和导出仍可用，智能问答会受影响。

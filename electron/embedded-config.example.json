@@ -1,5 +1,5 @@
 {
   "llmApiKey": "replace_with_real_key_before_build",
-  "llmBaseUrl": "https://onerouter.cmaiot.cn/v1",
-  "llmModel": "qwen3.7-max"
+  "llmBaseUrl": "https://api.deepseek.com",
+  "llmModel": "deepseek-v4-pro"
 }

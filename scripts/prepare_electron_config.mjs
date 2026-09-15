@@ -27,8 +27,8 @@ async function exists(targetPath) {
 }
 
 const llmApiKey = process.env.LLM_API_KEY || "";
-const llmBaseUrl = process.env.LLM_BASE_URL || "https://onerouter.cmaiot.cn/v1";
-const llmModel = process.env.LLM_MODEL || "qwen3.7-max";
+const llmBaseUrl = process.env.LLM_BASE_URL || "https://api.deepseek.com";
+const llmModel = process.env.LLM_MODEL || "deepseek-v4-pro";
 const allowEmptyKey = process.env.ALLOW_EMPTY_LLM_KEY === "1";
 
 if (!llmApiKey && !allowEmptyKey) {

@@ -53,8 +53,8 @@ docker save product-huizhen:latest -o product-huizhen-latest.tar
 
 ```bash
 LLM_API_KEY=your_key_here
-LLM_BASE_URL=https://onerouter.cmaiot.cn/v1
-LLM_MODEL=qwen3.7-max
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-v4-pro
 ```
 
 接口需兼容 OpenAI Chat Completions：`POST /v1/chat/completions`。未配置 `LLM_API_KEY` 时，系统仍支持常见统计类本地问答，例如强制退市数量、规则命中数量等。

@@ -14,9 +14,9 @@ const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 4000);
 const LLM_API_KEY = process.env.LLM_API_KEY || "";
-const LLM_BASE_URL = (process.env.LLM_BASE_URL || "https://onerouter.cmaiot.cn/v1").replace(/\/+$/, "");
+const LLM_BASE_URL = (process.env.LLM_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
 const LLM_CHAT_COMPLETIONS_URL = process.env.LLM_CHAT_COMPLETIONS_URL || `${LLM_BASE_URL}/chat/completions`;
-const LLM_MODEL = process.env.LLM_MODEL || "qwen3.7-max";
+const LLM_MODEL = process.env.LLM_MODEL || "deepseek-v4-pro";
 const DEFAULT_BUNDLED_PYTHON =
   "/Users/apple/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3";
 const PYTHON_BIN = process.env.PYTHON_BIN || DEFAULT_BUNDLED_PYTHON;
@@ -254,7 +254,18 @@ async function runAnalyzerCli(args, errorPrefix) {
   }
 }
 
-async function runAnalyzer(productPath, revenuePaths, paths) {
+function getUploadDate() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+async function runAnalyzer(productPath, revenuePaths, paths, uploadDate) {
   return runAnalyzerCli(
     [
     "--product-list",
@@ -265,24 +276,28 @@ async function runAnalyzer(productPath, revenuePaths, paths) {
     paths.resultJson,
     "--output-xlsx",
     paths.resultXlsx,
+    "--as-of-date",
+    uploadDate,
     ],
     "分析脚本执行失败",
   );
 }
 
-async function runInspector(filePaths, paths) {
+async function runInspector(filePaths, paths, uploadDate) {
   return runAnalyzerCli(
     [
     "--inspect-files",
     ...filePaths,
     "--output-json",
     paths.inspectionJson,
+    "--as-of-date",
+    uploadDate,
     ],
     "预检脚本执行失败",
   );
 }
 
-async function runAnalyzerFromInspection(paths) {
+async function runAnalyzerFromInspection(paths, uploadDate) {
   return runAnalyzerCli(
     [
     "--mapping-json",
@@ -291,6 +306,8 @@ async function runAnalyzerFromInspection(paths) {
     paths.resultJson,
     "--output-xlsx",
     paths.resultXlsx,
+    "--as-of-date",
+    uploadDate,
     ],
     "分析脚本执行失败",
   );
@@ -432,7 +449,8 @@ function createAiContext(payload) {
       口径: {
         基准日期: payload.metadata.as_of_date,
         两年收入窗口: payload.metadata.revenue_window,
-        规则123状态范围: payload.metadata.active_statuses_for_rules_1_to_3,
+        规则12状态范围: payload.metadata.statuses_for_rules_1_and_2,
+        规则3状态范围: payload.metadata.statuses_for_rule_3,
         规则4状态范围: "退市中，且退市审批完成时间超过1年",
         规则4审批时间阈值: payload.metadata.rule4_approval_before,
       },
@@ -552,7 +570,7 @@ app.post("/api/inspect-upload", upload.array("analysisFiles", 12), async (req, r
       savedPaths.push(savedPath);
     }
 
-    await runInspector(savedPaths, paths);
+    await runInspector(savedPaths, paths, getUploadDate());
     let inspection = JSON.parse(await fs.readFile(paths.inspectionJson, "utf8"));
     inspection.files = (inspection.files || []).map((file) => ({
       ...file,
@@ -582,7 +600,7 @@ app.post("/api/analyze-inspection", async (req, res) => {
     if (!inspection.selected?.revenue_sheets?.length) {
       throw new Error("未识别到收入成本明细表，无法分析");
     }
-    await runAnalyzerFromInspection(paths);
+    await runAnalyzerFromInspection(paths, inspection.as_of_date || getUploadDate());
     const payload = await readCachedPayload(paths);
     const filesById = Object.fromEntries((inspection.files || []).map((file) => [file.id, file]));
     payload.metadata.uploaded_files = {
@@ -641,7 +659,7 @@ app.post(
         savedRevenuePaths.push(savedPath);
       }
 
-      await runAnalyzer(savedProductPath, savedRevenuePaths, paths);
+      await runAnalyzer(savedProductPath, savedRevenuePaths, paths, getUploadDate());
       const payload = await readCachedPayload(paths);
       payload.metadata.uploaded_files = {
         productList: productOriginalName,

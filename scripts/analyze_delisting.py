@@ -8,7 +8,7 @@ import sys
 import tempfile
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -21,9 +21,8 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 TARGET_REVENUE_SHEET = "收入及直接成本明细表"
 PRODUCT_LIST_SHEETS = ("自研类", "引入类")
 MAX_INSPECT_WORKERS = 4
-ACTIVE_STATUSES_FOR_RULES_1_TO_3 = {"已上市", "已入库"}
-REVENUE_START_MONTH = "2024-06"
-REVENUE_END_MONTH = "2026-05"
+STATUSES_FOR_RULES_1_AND_2 = {"已上市", "已入库", "退市中", "退库中"}
+STATUSES_FOR_RULE_3 = {"已上市", "已入库"}
 ERROR_LITERALS = {"#N/A", "#VALUE!", "#REF!", "#DIV/0!", "#NAME?", "#NULL!", "#NUM!"}
 
 
@@ -37,6 +36,33 @@ def subtract_years(value: date, years: int) -> date:
 AS_OF_DATE = date.today()
 OLDER_THAN_TWO_YEARS_BEFORE = subtract_years(AS_OF_DATE, 2)
 RULE4_APPROVAL_BEFORE = subtract_years(AS_OF_DATE, 1)
+REVENUE_START_MONTH = ""
+REVENUE_END_MONTH = ""
+
+
+def shift_month(value: date, offset: int) -> date:
+    month_index = value.year * 12 + value.month - 1 + offset
+    return date(month_index // 12, month_index % 12 + 1, 1)
+
+
+def configure_analysis(as_of_date: date) -> None:
+    """Set one upload-time-based business context for the whole analysis run."""
+    global AS_OF_DATE, OLDER_THAN_TWO_YEARS_BEFORE, RULE4_APPROVAL_BEFORE
+    global REVENUE_START_MONTH, REVENUE_END_MONTH
+
+    AS_OF_DATE = as_of_date
+    OLDER_THAN_TWO_YEARS_BEFORE = subtract_years(AS_OF_DATE, 2)
+    RULE4_APPROVAL_BEFORE = subtract_years(AS_OF_DATE, 1)
+
+    # Use the latest completed calendar month at upload time, then include 24
+    # complete months in total. This avoids mixing a partial current month into
+    # a two-year comparison while keeping the window current for every upload.
+    latest_complete_month = AS_OF_DATE.replace(day=1) - timedelta(days=1)
+    REVENUE_END_MONTH = latest_complete_month.strftime("%Y-%m")
+    REVENUE_START_MONTH = shift_month(latest_complete_month.replace(day=1), -23).strftime("%Y-%m")
+
+
+configure_analysis(AS_OF_DATE)
 OUTPUT_HEADERS = [
     "产品编码",
     "产品名称",
@@ -49,9 +75,9 @@ OUTPUT_HEADERS = [
     "理由",
 ]
 RULE_TEXT = {
-    "1": "已上市/已入库但未出现在收入及直接成本明细表",
-    "2": "创建时间超过2年或为空，且2年内产品收入为0",
-    "3": "创建时间超过2年或为空，且2年内产品毛利≤0",
+    "1": "已上市、已入库、退市中或退库中，创建时间超过2年或为空，且未出现在收入及直接成本明细表",
+    "2": "已上市、已入库、退市中或退库中，创建时间超过2年或为空，且2年内产品收入≤0",
+    "3": "已上市或已入库，创建时间超过2年或为空，且2年内产品毛利≤0",
     "4": "产品状态为退市中，且退市审批完成时间超过1年",
 }
 
@@ -64,6 +90,7 @@ PRODUCT_COLUMN_ALIASES = {
     "delisting_approval_completed": [
         "退市审批完成时间",
         "退市审批完成日期",
+        "产品退市审批时间",
         "审批完成时间",
         "审批完成日期",
         "退市完成时间",
@@ -164,8 +191,8 @@ def to_decimal(value: Any) -> Decimal:
 
 
 def decimal_to_number(value: Decimal) -> int | float:
-    rounded = value.quantize(Decimal("0.01"))
-    return int(rounded) if rounded == rounded.to_integral() else float(rounded)
+    """Keep the computed decimal value intact for output and rule auditability."""
+    return int(value) if value == value.to_integral() else float(value)
 
 
 def first_existing(headers: list[str], names: list[str]) -> int | None:
@@ -442,7 +469,7 @@ def inspect_single_workbook(task: tuple[int, Path]) -> dict[str, Any]:
                         "row_count": product_row_count,
                     }
                 )
-            if profile["revenue_score"] >= 4 and revenue_row_count >= 50:
+            if profile["revenue_score"] >= 4 and revenue_row_count >= 50 and month_summary["months"]:
                 revenue_candidates.append(
                     {
                         "file_id": file_id,
@@ -582,6 +609,7 @@ def inspect_workbooks(paths: list[Path]) -> dict[str, Any]:
         )
 
     return {
+        "as_of_date": AS_OF_DATE.isoformat(),
         "files": files,
         "selected": {
             "product_file_id": selected_product_file_id,
@@ -791,26 +819,28 @@ def build_candidates(
         product_gross_profit = revenue_values["产品毛利"]
         old_or_blank = product["创建日期"] is None or product["创建日期"] < OLDER_THAN_TWO_YEARS_BEFORE
         approval_completed_date = product.get("退市审批完成日期")
-        active = status in ACTIVE_STATUSES_FOR_RULES_1_TO_3
+        eligible_for_rules_1_and_2 = status in STATUSES_FOR_RULES_1_AND_2
+        eligible_for_rule_3 = status in STATUSES_FOR_RULE_3
         rules: list[str] = []
 
-        if active and code not in all_revenue_codes:
+        if eligible_for_rules_1_and_2 and old_or_blank and code not in all_revenue_codes:
             rules.append("1")
-        if active and old_or_blank and product_revenue == 0:
+        if eligible_for_rules_1_and_2 and old_or_blank and product_revenue <= 0:
             rules.append("2")
-        if active and old_or_blank and product_gross_profit <= 0:
+        if eligible_for_rule_3 and old_or_blank and product_gross_profit <= 0:
             rules.append("3")
         if status == "退市中":
             if approval_completed_date is None:
-                missing_approval_rows.append(
-                    {
-                        **product_base_row(product),
-                        "产品收入": decimal_to_number(product_revenue),
-                        "产品毛利": decimal_to_number(product_gross_profit),
-                        "退市审批完成时间": product.get("退市审批完成时间", ""),
-                        "问题": "缺少退市审批完成时间，无法判断规则4",
-                    }
-                )
+                if not {"1", "2"} & set(rules):
+                    missing_approval_rows.append(
+                        {
+                            **product_base_row(product),
+                            "产品收入": decimal_to_number(product_revenue),
+                            "产品毛利": decimal_to_number(product_gross_profit),
+                            "退市审批完成时间": product.get("退市审批完成时间", ""),
+                            "问题": "缺少退市审批完成时间，无法判断规则4",
+                        }
+                    )
             elif approval_completed_date < RULE4_APPROVAL_BEFORE:
                 rules.append("4")
         if not rules:
@@ -855,7 +885,8 @@ def make_payload(product_list_path: Path, revenue_paths: list[Path]) -> dict[str
             "older_than_two_years_before": OLDER_THAN_TWO_YEARS_BEFORE.isoformat(),
             "rule4_approval_before": RULE4_APPROVAL_BEFORE.isoformat(),
             "revenue_window": {"start_month": REVENUE_START_MONTH, "end_month": REVENUE_END_MONTH},
-            "active_statuses_for_rules_1_to_3": sorted(ACTIVE_STATUSES_FOR_RULES_1_TO_3),
+            "statuses_for_rules_1_and_2": sorted(STATUSES_FOR_RULES_1_AND_2),
+            "statuses_for_rule_3": sorted(STATUSES_FOR_RULE_3),
             "product_summary": product_summary,
             "revenue_workbooks": workbook_summaries,
             "all_revenue_code_count": len(all_revenue_codes),
@@ -891,7 +922,8 @@ def make_payload_from_mapping(inspection: dict[str, Any]) -> dict[str, Any]:
             "older_than_two_years_before": OLDER_THAN_TWO_YEARS_BEFORE.isoformat(),
             "rule4_approval_before": RULE4_APPROVAL_BEFORE.isoformat(),
             "revenue_window": {"start_month": REVENUE_START_MONTH, "end_month": REVENUE_END_MONTH},
-            "active_statuses_for_rules_1_to_3": sorted(ACTIVE_STATUSES_FOR_RULES_1_TO_3),
+            "statuses_for_rules_1_and_2": sorted(STATUSES_FOR_RULES_1_AND_2),
+            "statuses_for_rule_3": sorted(STATUSES_FOR_RULE_3),
             "product_summary": product_summary,
             "revenue_workbooks": workbook_summaries,
             "all_revenue_code_count": len(all_revenue_codes),
@@ -930,7 +962,7 @@ def write_output_workbook(payload: dict[str, Any], output_path: Path) -> None:
         cell.alignment = Alignment(horizontal="center")
     for row in result.iter_rows(min_row=2, min_col=6, max_col=7):
         for cell in row:
-            cell.number_format = "#,##0.00"
+            cell.number_format = "#,##0.00##############"
     for row in result.iter_rows(min_row=2, min_col=8, max_col=9):
         for cell in row:
             cell.alignment = Alignment(wrap_text=True, vertical="top")
@@ -946,7 +978,8 @@ def write_output_workbook(payload: dict[str, Any], output_path: Path) -> None:
         ["2年创建时间阈值", f"早于 {metadata['older_than_two_years_before']}，或创建时间为空"],
         ["规则4审批时间阈值", f"早于 {metadata['rule4_approval_before']}，即退市审批完成时间超过1年"],
         ["2年经营数据窗口", f"{metadata['revenue_window']['start_month']} 至 {metadata['revenue_window']['end_month']}"],
-        ["规则1/2/3状态范围", "、".join(metadata["active_statuses_for_rules_1_to_3"])],
+        ["规则1/2状态范围", "、".join(metadata["statuses_for_rules_1_and_2"])],
+        ["规则3状态范围", "、".join(metadata["statuses_for_rule_3"])],
         ["规则4状态范围", "退市中；且退市审批完成时间超过1年"],
         ["候选总数", metadata["candidate_count"]],
         ["无法判断规则4数量", metadata.get("missing_rule4_approval_count", 0)],
@@ -1016,7 +1049,7 @@ def write_output_workbook(payload: dict[str, Any], output_path: Path) -> None:
         cell.alignment = Alignment(horizontal="center")
     for row in missing_sheet.iter_rows(min_row=2, min_col=6, max_col=7):
         for cell in row:
-            cell.number_format = "#,##0.00"
+            cell.number_format = "#,##0.00##############"
     for row in missing_sheet.iter_rows(min_row=2, min_col=8, max_col=9):
         for cell in row:
             cell.alignment = Alignment(wrap_text=True, vertical="top")
@@ -1034,9 +1067,16 @@ def main() -> None:
     parser.add_argument("--mapping-json")
     parser.add_argument("--product-list")
     parser.add_argument("--revenue-files", nargs="+")
+    parser.add_argument("--as-of-date", help="上传日期，格式 YYYY-MM-DD")
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--output-xlsx")
     args = parser.parse_args()
+
+    if args.as_of_date:
+        try:
+            configure_analysis(date.fromisoformat(args.as_of_date))
+        except ValueError as error:
+            raise ValueError("--as-of-date 必须是 YYYY-MM-DD") from error
 
     output_json = Path(args.output_json)
     output_json.parent.mkdir(parents=True, exist_ok=True)
@@ -1055,6 +1095,11 @@ def main() -> None:
 
     if args.mapping_json:
         inspection = json.loads(Path(args.mapping_json).read_text(encoding="utf-8"))
+        if not args.as_of_date and inspection.get("as_of_date"):
+            try:
+                configure_analysis(date.fromisoformat(inspection["as_of_date"]))
+            except ValueError as error:
+                raise ValueError("预检中的上传日期格式无效") from error
         payload = make_payload_from_mapping(inspection)
     else:
         if not args.product_list or not args.revenue_files:

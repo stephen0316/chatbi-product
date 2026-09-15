@@ -967,7 +967,8 @@ button:has(.button-icon) {
   left: 50%;
   top: calc(100% + 14px);
   z-index: 8;
-  width: min(600px, calc(100vw - 64px));
+  width: max-content;
+  max-width: calc(100vw - 64px);
   padding: 22px 26px;
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -1011,7 +1012,7 @@ button:has(.button-icon) {
 }
 
 .rule-list > div {
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .rule-tooltip strong {

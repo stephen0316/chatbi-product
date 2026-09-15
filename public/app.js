@@ -85,7 +85,13 @@ const PUBLIC_FIELD_LABELS = {
 };
 
 function formatNumber(value) {
-  const number = Number(value || 0);
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  if (number !== 0 && Math.abs(number) < 0.005) {
+    return number.toLocaleString("zh-CN", {
+      maximumSignificantDigits: 12,
+    });
+  }
   return number.toLocaleString("zh-CN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -463,11 +469,14 @@ function renderInspection(inspection) {
   const revenueRange = revenueMonthSummary?.start_month
     ? `；月份覆盖：${escapeHtml(revenueMonthSummary.start_month)} 至 ${escapeHtml(revenueMonthSummary.end_month)}`
     : "";
+  const revenueWindow = inspection.revenue_window?.start_month
+    ? `；本次统计窗口：${escapeHtml(inspection.revenue_window.start_month)} 至 ${escapeHtml(inspection.revenue_window.end_month)}`
+    : "";
   const resultNote = warnings || `<div class="inspection-ok">预检未发现阻断项，可以开始分析。</div>`;
   inspectionPanel.innerHTML = `
     <div class="inspection-title">
       <span>预检结果</span>
-      <span>产品列表：${escapeHtml(productName)}；收入明细：${revenueCount} 个文件${revenueRange}</span>
+      <span>产品列表：${escapeHtml(productName)}；收入明细：${revenueCount} 个文件${revenueRange}${revenueWindow}</span>
     </div>
     <div class="inspection-list">${items}</div>
     ${resultNote}
